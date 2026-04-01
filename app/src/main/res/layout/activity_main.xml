@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <ImageView
+        android:id="@+id/previewImage"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:layout_marginBottom="16dp"
+        android:background="#1A000000"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/pokemonName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:text="#025 Pikachu"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="오버레이 권한이 필요합니다"
+        android:textColor="#666666"
+        android:textSize="14sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnToggleService"
+        android:layout_width="240dp"
+        android:layout_height="wrap_content"
+        android:text="펫 시작하기" />
+
+</LinearLayout>
