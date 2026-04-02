@@ -77,7 +77,7 @@ class PokemonAdapter(
 
             val pokemonId = pokemon.id
             thread {
-                val thumbnail = repository.getThumbnail(pokemonId)
+                val thumbnail = repository.getPortrait(pokemonId)
                 holder.spriteImage.post {
                     if (holder.adapterPosition != RecyclerView.NO_POSITION
                         && items.getOrNull(holder.adapterPosition)?.id == pokemonId

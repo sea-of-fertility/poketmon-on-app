@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
 
         val previewImage = findViewById<ImageView>(R.id.previewImage)
         kotlin.concurrent.thread {
-            val thumbnail = repository.getThumbnail(pokemon.id)
+            val thumbnail = repository.getPortrait(pokemon.id)
             previewImage.post {
                 previewImage.setImageBitmap(thumbnail)
             }
