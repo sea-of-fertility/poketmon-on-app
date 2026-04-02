@@ -1,5 +1,7 @@
 package com.example.poketmon_on_app.ui
 
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +17,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.poketmon_on_app.R
 import com.example.poketmon_on_app.pet.PokemonData
 import com.example.poketmon_on_app.pet.PokemonRepository
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 
@@ -25,9 +29,23 @@ class PokemonListFragment : Fragment() {
 
     var onPokemonSelected: ((PokemonData) -> Unit)? = null
 
-    private var selectedGen: Int? = null
-    private var selectedType: String? = null
+    private var selectedGens: MutableSet<Int> = mutableSetOf()
+    private var selectedTypes: MutableSet<String> = mutableSetOf()
     private var searchQuery: String = ""
+
+    private val genColors = mapOf(
+        1 to "#E3350D", 2 to "#C4A23B", 3 to "#A12B2F",
+        4 to "#5A78B4", 5 to "#444444",
+    )
+
+    private val typeColors = mapOf(
+        "Normal" to "#A8A878", "Fire" to "#F08030", "Water" to "#6890F0",
+        "Grass" to "#78C850", "Electric" to "#F8D030", "Ice" to "#98D8D8",
+        "Fighting" to "#C03028", "Poison" to "#A040A0", "Ground" to "#E0C068",
+        "Flying" to "#A890F0", "Psychic" to "#F85888", "Bug" to "#A8B820",
+        "Rock" to "#B8A038", "Ghost" to "#705898", "Dragon" to "#7038F8",
+        "Dark" to "#705848", "Steel" to "#B8B8D0", "Fairy" to "#EE99AC",
+    )
 
     private val debounceHandler = Handler(Looper.getMainLooper())
     private var debounceRunnable: Runnable? = null
@@ -54,65 +72,192 @@ class PokemonListFragment : Fragment() {
         grid.layoutManager = GridLayoutManager(requireContext(), 5)
         grid.adapter = adapter
 
-        setupGenChips(view)
-        setupTypeChips(view)
+        setupGenFilter(view)
+        setupTypeFilter(view)
         setupSearch(view)
 
         applyFilter()
     }
 
-    private fun setupGenChips(view: View) {
-        val chipGroup = view.findViewById<ChipGroup>(R.id.genChipGroup)
+    private fun setupGenFilter(view: View) {
+        val filterBtn = view.findViewById<MaterialButton>(R.id.genFilterBtn)
+        filterBtn.setOnClickListener { showGenBottomSheet(view) }
+    }
 
-        // "전체" chip
-        val allChip = Chip(requireContext()).apply {
-            text = "전체"
-            isCheckable = true
-            isChecked = true
-        }
-        chipGroup.addView(allChip)
+    private fun setupTypeFilter(view: View) {
+        val filterBtn = view.findViewById<MaterialButton>(R.id.typeFilterBtn)
+        filterBtn.setOnClickListener { showTypeBottomSheet(view) }
+    }
+
+    private fun showGenBottomSheet(rootView: View) {
+        val dialog = BottomSheetDialog(requireContext())
+        val sheet = layoutInflater.inflate(R.layout.bottom_sheet_gen_filter, null)
+        dialog.setContentView(sheet)
+
+        val chipGroup = sheet.findViewById<ChipGroup>(R.id.bsGenChipGroup)
+        val tempSelected = selectedGens.toMutableSet()
 
         for (gen in repository.getGenerations()) {
+            val color = Color.parseColor(genColors[gen] ?: "#888888")
             val chip = Chip(requireContext()).apply {
                 text = "${gen}세대"
                 isCheckable = true
+                isChecked = gen in tempSelected
                 tag = gen
+                chipBackgroundColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(color, Color.WHITE)
+                )
+                setTextColor(ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(Color.WHITE, color)
+                ))
+                chipStrokeWidth = 1.5f * resources.displayMetrics.density
+                chipStrokeColor = ColorStateList.valueOf(color)
             }
             chipGroup.addView(chip)
         }
 
-        chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty() || checkedIds.contains(allChip.id)) {
-                selectedGen = null
-                allChip.isChecked = true
-            } else {
-                val checkedChip = chipGroup.findViewById<Chip>(checkedIds[0])
-                selectedGen = checkedChip?.tag as? Int
+        sheet.findViewById<View>(R.id.bsResetBtn).setOnClickListener {
+            for (i in 0 until chipGroup.childCount) {
+                (chipGroup.getChildAt(i) as? Chip)?.isChecked = false
             }
-            applyFilter()
+            tempSelected.clear()
         }
+
+        chipGroup.setOnCheckedStateChangeListener { group, _ ->
+            tempSelected.clear()
+            for (i in 0 until group.childCount) {
+                val chip = group.getChildAt(i) as? Chip ?: continue
+                if (chip.isChecked) tempSelected.add(chip.tag as Int)
+            }
+        }
+
+        sheet.findViewById<View>(R.id.bsApplyBtn).setOnClickListener {
+            selectedGens = tempSelected
+            updateSelectedTags(rootView)
+            applyFilter()
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
-    private fun setupTypeChips(view: View) {
-        val chipGroup = view.findViewById<ChipGroup>(R.id.typeChipGroup)
+    private fun showTypeBottomSheet(rootView: View) {
+        val dialog = BottomSheetDialog(requireContext())
+        val sheet = layoutInflater.inflate(R.layout.bottom_sheet_type_filter, null)
+        dialog.setContentView(sheet)
+
+        val chipGroup = sheet.findViewById<ChipGroup>(R.id.bsTypeChipGroup)
+        val tempSelected = selectedTypes.toMutableSet()
 
         for (type in repository.getAllTypes()) {
+            val color = Color.parseColor(typeColors[type] ?: "#888888")
             val chip = Chip(requireContext()).apply {
                 text = type
                 isCheckable = true
+                isChecked = type in tempSelected
                 tag = type
+                chipBackgroundColor = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(color, Color.WHITE)
+                )
+                setTextColor(ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(Color.WHITE, color)
+                ))
+                chipStrokeWidth = 1.5f * resources.displayMetrics.density
+                chipStrokeColor = ColorStateList.valueOf(color)
             }
             chipGroup.addView(chip)
         }
 
-        chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) {
-                selectedType = null
-            } else {
-                val checkedChip = chipGroup.findViewById<Chip>(checkedIds[0])
-                selectedType = checkedChip?.tag as? String
+        sheet.findViewById<View>(R.id.bsResetBtn).setOnClickListener {
+            for (i in 0 until chipGroup.childCount) {
+                (chipGroup.getChildAt(i) as? Chip)?.isChecked = false
             }
+            tempSelected.clear()
+        }
+
+        chipGroup.setOnCheckedStateChangeListener { group, _ ->
+            tempSelected.clear()
+            for (i in 0 until group.childCount) {
+                val chip = group.getChildAt(i) as? Chip ?: continue
+                if (chip.isChecked) tempSelected.add(chip.tag as String)
+            }
+        }
+
+        sheet.findViewById<View>(R.id.bsApplyBtn).setOnClickListener {
+            selectedTypes = tempSelected
+            updateSelectedTags(rootView)
             applyFilter()
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun updateSelectedTags(view: View) {
+        val genBtn = view.findViewById<MaterialButton>(R.id.genFilterBtn)
+        val typeBtn = view.findViewById<MaterialButton>(R.id.typeFilterBtn)
+        val chipGroup = view.findViewById<ChipGroup>(R.id.selectedFilterChips)
+        chipGroup.removeAllViews()
+
+        val activeColor = ColorStateList.valueOf(Color.parseColor("#4CAF50"))
+        val defaultColor = ColorStateList.valueOf(Color.parseColor("#DDDDDD"))
+
+        // Gen button state
+        if (selectedGens.isEmpty()) {
+            genBtn.text = "세대"
+            genBtn.strokeColor = defaultColor
+        } else {
+            genBtn.text = "세대 ${selectedGens.size}"
+            genBtn.strokeColor = activeColor
+        }
+
+        // Type button state
+        if (selectedTypes.isEmpty()) {
+            typeBtn.text = "속성"
+            typeBtn.strokeColor = defaultColor
+        } else {
+            typeBtn.text = "속성 ${selectedTypes.size}"
+            typeBtn.strokeColor = activeColor
+        }
+
+        // Gen tags
+        for (gen in selectedGens.sorted()) {
+            val color = Color.parseColor(genColors[gen] ?: "#888888")
+            val chip = Chip(requireContext()).apply {
+                text = "${gen}세대"
+                isCloseIconVisible = true
+                setTextColor(Color.WHITE)
+                chipBackgroundColor = ColorStateList.valueOf(color)
+                closeIconTint = ColorStateList.valueOf(Color.WHITE)
+                setOnCloseIconClickListener {
+                    selectedGens.remove(gen)
+                    updateSelectedTags(view)
+                    applyFilter()
+                }
+            }
+            chipGroup.addView(chip)
+        }
+
+        // Type tags
+        for (type in selectedTypes) {
+            val color = Color.parseColor(typeColors[type] ?: "#888888")
+            val chip = Chip(requireContext()).apply {
+                text = type
+                isCloseIconVisible = true
+                setTextColor(Color.WHITE)
+                chipBackgroundColor = ColorStateList.valueOf(color)
+                closeIconTint = ColorStateList.valueOf(Color.WHITE)
+                setOnCloseIconClickListener {
+                    selectedTypes.remove(type)
+                    updateSelectedTags(view)
+                    applyFilter()
+                }
+            }
+            chipGroup.addView(chip)
         }
     }
 
@@ -133,7 +278,7 @@ class PokemonListFragment : Fragment() {
     }
 
     private fun applyFilter() {
-        val filtered = repository.filter(gen = selectedGen, type = selectedType, query = searchQuery)
+        val filtered = repository.filter(gens = selectedGens, types = selectedTypes, query = searchQuery)
         adapter.submitList(filtered)
     }
 

@@ -25,44 +25,68 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Generation filter chips -->
-    <HorizontalScrollView
-        android:id="@+id/genScrollView"
+    <!-- Filter buttons + selected tags -->
+    <LinearLayout
+        android:id="@+id/filterRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:scrollbars="none"
+        android:layout_marginBottom="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         app:layout_constraintTop_toBottomOf="@id/searchInput"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/genChipGroup"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/genFilterBtn"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            app:singleSelection="true" />
-    </HorizontalScrollView>
+            android:layout_height="36dp"
+            android:text="세대"
+            android:textSize="12sp"
+            android:minWidth="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            app:iconSize="16dp"
+            app:iconPadding="4dp"
+            app:cornerRadius="18dp"
+            app:strokeColor="#DDDDDD" />
 
-    <!-- Type filter chips (scrollable, max 80dp) -->
-    <ScrollView
-        android:id="@+id/typeScrollView"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:scrollbars="vertical"
-        android:fadeScrollbars="true"
-        app:layout_constraintHeight_max="80dp"
-        app:layout_constraintTop_toBottomOf="@id/genScrollView"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/typeFilterBtn"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:text="속성"
+            android:textSize="12sp"
+            android:minWidth="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            app:icon="@drawable/ic_filter"
+            app:iconSize="16dp"
+            app:iconPadding="4dp"
+            app:cornerRadius="18dp"
+            app:strokeColor="#DDDDDD" />
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/typeChipGroup"
-            android:layout_width="match_parent"
+        <HorizontalScrollView
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            app:singleSelection="true" />
-    </ScrollView>
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/selectedFilterChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleLine="true" />
+        </HorizontalScrollView>
+    </LinearLayout>
 
     <!-- Pokemon grid -->
     <androidx.recyclerview.widget.RecyclerView
@@ -70,7 +94,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
-        app:layout_constraintTop_toBottomOf="@id/typeScrollView"
+        app:layout_constraintTop_toBottomOf="@id/filterRow"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

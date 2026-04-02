@@ -27,14 +27,20 @@ class PokemonRepository(private val context: Context) {
 
     fun filter(
         gen: Int? = null,
+        gens: Set<Int> = emptySet(),
         type: String? = null,
+        types: Set<String> = emptySet(),
         query: String = ""
     ): List<PokemonData> {
         var list = allPokemon
-        if (gen != null) {
+        if (gens.isNotEmpty()) {
+            list = list.filter { it.gen in gens }
+        } else if (gen != null) {
             list = list.filter { it.gen == gen }
         }
-        if (type != null) {
+        if (types.isNotEmpty()) {
+            list = list.filter { pokemon -> pokemon.types.any { it in types } }
+        } else if (type != null) {
             list = list.filter { type in it.types }
         }
         if (query.isNotBlank()) {
