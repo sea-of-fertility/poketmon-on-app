@@ -4,7 +4,9 @@
       "Bash(./gradlew assembleDebug)",
       "Bash(git reset:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb shell:*)",
+      "Bash(git:*)"
     ]
   }
 }
