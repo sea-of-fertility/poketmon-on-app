@@ -76,7 +76,7 @@ class PetOverlayService : Service() {
     private var screenHeight = 0
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val updateIntervalMs = 16L
+    private val updateIntervalMs = 50L // ~20fps — sufficient for overlay movement, avoids System UI overload
 
     // Screen state receiver
     private val screenReceiver = object : BroadcastReceiver() {
@@ -111,9 +111,15 @@ class PetOverlayService : Service() {
 
     private val gameLoop = object : Runnable {
         override fun run() {
-            stateMachine?.update()
-            moveOverlay()
-            mainHandler.postDelayed(this, updateIntervalMs)
+            val sm = stateMachine
+            sm?.update()
+            if (sm?.currentState == PetState.WALK || sm?.currentState == PetState.RUN) {
+                moveOverlay()
+                mainHandler.postDelayed(this, updateIntervalMs)
+            } else {
+                // IDLE/SLEEP/REACTION — no movement needed, poll less frequently
+                mainHandler.postDelayed(this, 500L)
+            }
         }
     }
 
@@ -444,11 +450,11 @@ class PetOverlayService : Service() {
 
     // ---- Pokemon loading ----
 
+    private val pokemonRepository: PokemonRepository by lazy { PokemonRepository(this) }
+
     private fun loadPokemon(pokemonId: Int) {
         mainHandler.removeCallbacks(gameLoop)
-        // Update pokemon name for notification
-        val repo = PokemonRepository(this)
-        currentPokemonName = repo.getAll().find { it.id == pokemonId }?.name ?: "포켓몬"
+        currentPokemonName = pokemonRepository.getAll().find { it.id == pokemonId }?.name ?: "포켓몬"
         thread {
             val sheet = SpriteSheet(this, pokemonId)
             mainHandler.post {
