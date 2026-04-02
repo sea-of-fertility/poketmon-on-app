@@ -43,6 +43,7 @@
             android:layout_width="wrap_content"
             android:layout_height="36dp"
             android:text="세대"
+            android:textColor="#555555"
             android:textSize="12sp"
             android:minWidth="0dp"
             android:insetTop="0dp"
@@ -61,6 +62,7 @@
             android:layout_height="36dp"
             android:layout_marginStart="6dp"
             android:text="속성"
+            android:textColor="#555555"
             android:textSize="12sp"
             android:minWidth="0dp"
             android:insetTop="0dp"
@@ -73,19 +75,6 @@
             app:cornerRadius="18dp"
             app:strokeColor="#DDDDDD" />
 
-        <HorizontalScrollView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:scrollbars="none">
-
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/selectedFilterChips"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:singleLine="true" />
-        </HorizontalScrollView>
     </LinearLayout>
 
     <!-- Pokemon grid -->

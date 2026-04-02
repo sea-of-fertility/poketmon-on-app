@@ -200,64 +200,35 @@ class PokemonListFragment : Fragment() {
     private fun updateSelectedTags(view: View) {
         val genBtn = view.findViewById<MaterialButton>(R.id.genFilterBtn)
         val typeBtn = view.findViewById<MaterialButton>(R.id.typeFilterBtn)
-        val chipGroup = view.findViewById<ChipGroup>(R.id.selectedFilterChips)
-        chipGroup.removeAllViews()
 
-        val activeColor = ColorStateList.valueOf(Color.parseColor("#4CAF50"))
-        val defaultColor = ColorStateList.valueOf(Color.parseColor("#DDDDDD"))
+        val activeColor = Color.parseColor("#4CAF50")
+        val defaultStroke = ColorStateList.valueOf(Color.parseColor("#DDDDDD"))
+        val defaultTextColor = Color.parseColor("#555555")
 
         // Gen button state
         if (selectedGens.isEmpty()) {
             genBtn.text = "세대"
-            genBtn.strokeColor = defaultColor
+            genBtn.strokeColor = defaultStroke
+            genBtn.setTextColor(defaultTextColor)
+            genBtn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
         } else {
             genBtn.text = "세대 ${selectedGens.size}"
-            genBtn.strokeColor = activeColor
+            genBtn.strokeColor = ColorStateList.valueOf(activeColor)
+            genBtn.setTextColor(Color.WHITE)
+            genBtn.backgroundTintList = ColorStateList.valueOf(activeColor)
         }
 
         // Type button state
         if (selectedTypes.isEmpty()) {
             typeBtn.text = "속성"
-            typeBtn.strokeColor = defaultColor
+            typeBtn.strokeColor = defaultStroke
+            typeBtn.setTextColor(defaultTextColor)
+            typeBtn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
         } else {
             typeBtn.text = "속성 ${selectedTypes.size}"
-            typeBtn.strokeColor = activeColor
-        }
-
-        // Gen tags
-        for (gen in selectedGens.sorted()) {
-            val color = Color.parseColor(genColors[gen] ?: "#888888")
-            val chip = Chip(requireContext()).apply {
-                text = "${gen}세대"
-                isCloseIconVisible = true
-                setTextColor(Color.WHITE)
-                chipBackgroundColor = ColorStateList.valueOf(color)
-                closeIconTint = ColorStateList.valueOf(Color.WHITE)
-                setOnCloseIconClickListener {
-                    selectedGens.remove(gen)
-                    updateSelectedTags(view)
-                    applyFilter()
-                }
-            }
-            chipGroup.addView(chip)
-        }
-
-        // Type tags
-        for (type in selectedTypes) {
-            val color = Color.parseColor(typeColors[type] ?: "#888888")
-            val chip = Chip(requireContext()).apply {
-                text = type
-                isCloseIconVisible = true
-                setTextColor(Color.WHITE)
-                chipBackgroundColor = ColorStateList.valueOf(color)
-                closeIconTint = ColorStateList.valueOf(Color.WHITE)
-                setOnCloseIconClickListener {
-                    selectedTypes.remove(type)
-                    updateSelectedTags(view)
-                    applyFilter()
-                }
-            }
-            chipGroup.addView(chip)
+            typeBtn.strokeColor = ColorStateList.valueOf(activeColor)
+            typeBtn.setTextColor(Color.WHITE)
+            typeBtn.backgroundTintList = ColorStateList.valueOf(activeColor)
         }
     }
 
