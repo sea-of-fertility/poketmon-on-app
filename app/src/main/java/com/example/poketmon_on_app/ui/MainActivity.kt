@@ -1,5 +1,6 @@
 package com.example.poketmon_on_app.ui
 
+import android.app.ActivityManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -80,8 +81,19 @@ class MainActivity : AppCompatActivity() {
         updateUI()
     }
 
+    @Suppress("DEPRECATION")
+    private fun isServiceActuallyRunning(): Boolean {
+        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        return manager.getRunningServices(Integer.MAX_VALUE)
+            .any { it.service.className == PetOverlayService::class.java.name }
+    }
+
     override fun onResume() {
         super.onResume()
+        val actuallyRunning = isServiceActuallyRunning()
+        if (preferences.isServiceRunning && !actuallyRunning) {
+            preferences.isServiceRunning = false
+        }
         serviceRunning = preferences.isServiceRunning
         registerReceiver(
             stateReceiver,
