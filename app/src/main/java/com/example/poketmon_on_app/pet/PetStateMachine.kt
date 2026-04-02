@@ -2,9 +2,16 @@ package com.example.poketmon_on_app.pet
 
 import kotlin.random.Random
 
-enum class PetState {
-    IDLE, WALK, RUN, SLEEP, REACTION, DRAGGED
+enum class PetState(val displayLabel: String) {
+    IDLE("대기 중"),
+    WALK("걷는 중"),
+    RUN("뛰는 중"),
+    SLEEP("자는 중"),
+    REACTION("반응 중"),
+    DRAGGED("드래그 중")
 }
+
+private data class TransitionTiming(val minDelayMs: Long, val spreadSeconds: Float)
 
 class PetStateMachine(
     private val spriteSheet: SpriteSheet,
@@ -40,24 +47,19 @@ class PetStateMachine(
         when (currentState) {
             PetState.IDLE -> {
                 val idleMs = now - idleSinceMs
-                // Check sleep timeout
                 if (idleMs >= sleepTimeoutMs) {
                     transitionTo(PetState.SLEEP)
                     return
                 }
-                // Random walk transition
-                val transitionRange = idleTransitionRange()
-                if (stateTimer >= transitionRange.first &&
-                    Random.nextFloat() < dt.toFloat() / (transitionRange.second * 1000f)) {
+                val timing = idleTransitionTiming()
+                if (shouldTransition(stateTimer, dt, timing)) {
                     transitionTo(PetState.WALK)
                 }
             }
             PetState.WALK -> {
-                val walkRange = walkDurationRange()
-                if (stateTimer >= walkRange.first) {
-                    if (Random.nextFloat() < dt.toFloat() / (walkRange.second * 1000f)) {
-                        transitionTo(PetState.IDLE)
-                    }
+                val timing = walkDurationTiming()
+                if (shouldTransition(stateTimer, dt, timing)) {
+                    transitionTo(PetState.IDLE)
                 }
             }
             PetState.RUN -> {
@@ -147,27 +149,26 @@ class PetStateMachine(
         direction = Direction.from(dx, dy)
     }
 
-    // Idle→Walk transition time range (seconds)
-    private fun idleTransitionRange(): Pair<Long, Float> {
-        return when (activityLevel) {
-            1 -> Pair(5000L, 10f)
-            2 -> Pair(3000L, 7f)
-            3 -> Pair(2000L, 5f)
-            4 -> Pair(1000L, 3f)
-            5 -> Pair(500L, 2f)
-            else -> Pair(2000L, 5f)
-        }
+    private fun shouldTransition(elapsed: Long, dt: Long, timing: TransitionTiming): Boolean {
+        return elapsed >= timing.minDelayMs &&
+            Random.nextFloat() < dt.toFloat() / (timing.spreadSeconds * 1000f)
     }
 
-    // Walk duration range (seconds)
-    private fun walkDurationRange(): Pair<Long, Float> {
-        return when (activityLevel) {
-            1 -> Pair(2000L, 4f)
-            2 -> Pair(2500L, 6f)
-            3 -> Pair(3000L, 10f)
-            4 -> Pair(5000L, 15f)
-            5 -> Pair(8000L, 20f)
-            else -> Pair(3000L, 10f)
-        }
+    private fun idleTransitionTiming(): TransitionTiming = when (activityLevel) {
+        1 -> TransitionTiming(5000L, 10f)
+        2 -> TransitionTiming(3000L, 7f)
+        3 -> TransitionTiming(2000L, 5f)
+        4 -> TransitionTiming(1000L, 3f)
+        5 -> TransitionTiming(500L, 2f)
+        else -> TransitionTiming(2000L, 5f)
+    }
+
+    private fun walkDurationTiming(): TransitionTiming = when (activityLevel) {
+        1 -> TransitionTiming(2000L, 4f)
+        2 -> TransitionTiming(2500L, 6f)
+        3 -> TransitionTiming(3000L, 10f)
+        4 -> TransitionTiming(5000L, 15f)
+        5 -> TransitionTiming(8000L, 20f)
+        else -> TransitionTiming(3000L, 10f)
     }
 }

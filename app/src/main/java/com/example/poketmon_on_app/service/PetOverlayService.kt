@@ -51,7 +51,6 @@ class PetOverlayService : Service() {
     private var layoutParams: WindowManager.LayoutParams? = null
     private var stateMachine: PetStateMachine? = null
     private var currentSheet: SpriteSheet? = null
-    private var currentAnimName: String = "Idle"
 
     private var screenWidth = 0
     private var screenHeight = 0
@@ -325,7 +324,7 @@ class PetOverlayService : Service() {
     // ---- Settings & Resize ----
 
     private fun applySettings() {
-        resizeOverlay()
+        resizeOverlayToMax()
         petView?.alpha = preferences.opacity / 100f
         stateMachine?.apply {
             baseSpeed = preferences.getMoveSpeedPx()
@@ -374,9 +373,6 @@ class PetOverlayService : Service() {
         } catch (_: Exception) {}
     }
 
-    private fun resizeOverlay() {
-        resizeOverlayToMax()
-    }
 
     // ---- Pokemon loading ----
 

@@ -76,6 +76,8 @@ class SpriteSheet(context: Context, pokemonId: Int) {
         return listOf("Hop", "Hurt", "Eat").filter { it in availableAnims }
     }
 
+    private enum class XmlField { NAME, FRAME_WIDTH, FRAME_HEIGHT, DURATION, NONE }
+
     private fun parseAnimData(context: Context): Map<String, AnimInfo> {
         val result = mutableMapOf<String, AnimInfo>()
         val input = context.assets.open("$folder/AnimData.xml")
@@ -86,10 +88,7 @@ class SpriteSheet(context: Context, pokemonId: Int) {
         var frameWidth = 0
         var frameHeight = 0
         var durations = mutableListOf<Int>()
-        var inDuration = false
-        var inName = false
-        var inFrameWidth = false
-        var inFrameHeight = false
+        var activeField = XmlField.NONE
 
         while (parser.eventType != XmlPullParser.END_DOCUMENT) {
             when (parser.eventType) {
@@ -100,32 +99,28 @@ class SpriteSheet(context: Context, pokemonId: Int) {
                         frameHeight = 0
                         durations = mutableListOf()
                     }
-                    "Name" -> inName = true
-                    "FrameWidth" -> inFrameWidth = true
-                    "FrameHeight" -> inFrameHeight = true
-                    "Duration" -> inDuration = true
+                    "Name" -> activeField = XmlField.NAME
+                    "FrameWidth" -> activeField = XmlField.FRAME_WIDTH
+                    "FrameHeight" -> activeField = XmlField.FRAME_HEIGHT
+                    "Duration" -> activeField = XmlField.DURATION
                 }
                 XmlPullParser.TEXT -> {
                     val text = parser.text.trim()
                     if (text.isNotEmpty()) {
-                        when {
-                            inName -> currentName = text
-                            inFrameWidth -> frameWidth = text.toInt()
-                            inFrameHeight -> frameHeight = text.toInt()
-                            inDuration -> durations.add(text.toInt())
+                        when (activeField) {
+                            XmlField.NAME -> currentName = text
+                            XmlField.FRAME_WIDTH -> frameWidth = text.toInt()
+                            XmlField.FRAME_HEIGHT -> frameHeight = text.toInt()
+                            XmlField.DURATION -> durations.add(text.toInt())
+                            XmlField.NONE -> {}
                         }
                     }
                 }
-                XmlPullParser.END_TAG -> when (parser.name) {
-                    "Name" -> inName = false
-                    "FrameWidth" -> inFrameWidth = false
-                    "FrameHeight" -> inFrameHeight = false
-                    "Duration" -> inDuration = false
-                    "Anim" -> {
-                        if (currentName != null && frameWidth > 0 && frameHeight > 0) {
-                            result[currentName!!] = AnimInfo(currentName!!, frameWidth, frameHeight, durations.toList())
-                        }
+                XmlPullParser.END_TAG -> {
+                    if (parser.name == "Anim" && currentName != null && frameWidth > 0 && frameHeight > 0) {
+                        result[currentName!!] = AnimInfo(currentName!!, frameWidth, frameHeight, durations.toList())
                     }
+                    activeField = XmlField.NONE
                 }
             }
             parser.next()

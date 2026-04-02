@@ -28,15 +28,6 @@ class PetNotificationManager(
     }
 
     fun build(pokemonName: String, state: PetState): Notification {
-        val stateLabel = when (state) {
-            PetState.IDLE -> "대기 중"
-            PetState.WALK -> "걷는 중"
-            PetState.RUN -> "뛰는 중"
-            PetState.SLEEP -> "자는 중"
-            PetState.REACTION -> "반응 중"
-            PetState.DRAGGED -> "드래그 중"
-        }
-
         val sleepLabel = if (state == PetState.SLEEP) "깨우기" else "재우기"
 
         val stopIntent = PendingIntent.getService(
@@ -55,7 +46,7 @@ class PetNotificationManager(
         )
 
         return Notification.Builder(service, channelId)
-            .setContentTitle("$pokemonName - $stateLabel")
+            .setContentTitle("$pokemonName - ${state.displayLabel}")
             .setContentText("화면에서 놀고 있습니다!")
             .setSmallIcon(R.mipmap.ic_launcher)
             .addAction(Notification.Action.Builder(null, sleepLabel, sleepIntent).build())

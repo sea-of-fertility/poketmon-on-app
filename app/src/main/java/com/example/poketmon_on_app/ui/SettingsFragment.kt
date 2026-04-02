@@ -40,82 +40,58 @@ class SettingsFragment : Fragment() {
         setupSleep(view)
     }
 
-    private fun setupScale(view: View) {
-        val seekBar = view.findViewById<SeekBar>(R.id.seekScale)
-        val label = view.findViewById<TextView>(R.id.valScale)
-        // SeekBar range: 0~150, maps to 50~200%
-        val current = preferences.scale
-        seekBar.progress = current - 50
-        label.text = "${current}%"
+    private fun bindSeekBar(
+        view: View,
+        seekBarId: Int,
+        labelId: Int,
+        currentValue: Int,
+        offset: Int,
+        formatLabel: (Int) -> String,
+        onChanged: (Int) -> Unit
+    ) {
+        val seekBar = view.findViewById<SeekBar>(seekBarId)
+        val label = view.findViewById<TextView>(labelId)
+        seekBar.progress = currentValue - offset
+        label.text = formatLabel(currentValue)
 
         seekBar.setOnSeekBarChangeListener(object : SimpleSeekBarListener() {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                val value = progress + 50
-                label.text = "${value}%"
+                val value = progress + offset
+                label.text = formatLabel(value)
                 if (fromUser) {
-                    preferences.scale = value
+                    onChanged(value)
                     sendSettings()
                 }
             }
         })
+    }
+
+    private fun setupScale(view: View) {
+        bindSeekBar(view, R.id.seekScale, R.id.valScale,
+            currentValue = preferences.scale, offset = 50,
+            formatLabel = { "${it}%" },
+            onChanged = { preferences.scale = it })
     }
 
     private fun setupOpacity(view: View) {
-        val seekBar = view.findViewById<SeekBar>(R.id.seekOpacity)
-        val label = view.findViewById<TextView>(R.id.valOpacity)
-        // SeekBar range: 0~70, maps to 30~100%
-        val current = preferences.opacity
-        seekBar.progress = current - 30
-        label.text = "${current}%"
-
-        seekBar.setOnSeekBarChangeListener(object : SimpleSeekBarListener() {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                val value = progress + 30
-                label.text = "${value}%"
-                if (fromUser) {
-                    preferences.opacity = value
-                    sendSettings()
-                }
-            }
-        })
+        bindSeekBar(view, R.id.seekOpacity, R.id.valOpacity,
+            currentValue = preferences.opacity, offset = 30,
+            formatLabel = { "${it}%" },
+            onChanged = { preferences.opacity = it })
     }
 
     private fun setupSpeed(view: View) {
-        val seekBar = view.findViewById<SeekBar>(R.id.seekSpeed)
-        val label = view.findViewById<TextView>(R.id.valSpeed)
-        val current = preferences.moveSpeedLevel
-        seekBar.progress = current - 1
-        label.text = "$current"
-
-        seekBar.setOnSeekBarChangeListener(object : SimpleSeekBarListener() {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                val value = progress + 1
-                label.text = "$value"
-                if (fromUser) {
-                    preferences.moveSpeedLevel = value
-                    sendSettings()
-                }
-            }
-        })
+        bindSeekBar(view, R.id.seekSpeed, R.id.valSpeed,
+            currentValue = preferences.moveSpeedLevel, offset = 1,
+            formatLabel = { "$it" },
+            onChanged = { preferences.moveSpeedLevel = it })
     }
 
     private fun setupFrequency(view: View) {
-        val seekBar = view.findViewById<SeekBar>(R.id.seekFreq)
-        val label = view.findViewById<TextView>(R.id.valFreq)
-        val current = preferences.activityLevel
-        seekBar.progress = current - 1
-        label.text = "$current"
-
-        seekBar.setOnSeekBarChangeListener(object : SimpleSeekBarListener() {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                val value = progress + 1
-                label.text = "$value"
-                if (fromUser) {
-                    preferences.activityLevel = value
-                    sendSettings()
-                }
-            }
-        })
+        bindSeekBar(view, R.id.seekFreq, R.id.valFreq,
+            currentValue = preferences.activityLevel, offset = 1,
+            formatLabel = { "$it" },
+            onChanged = { preferences.activityLevel = it })
     }
 
     private fun setupHideInGame(view: View) {
@@ -153,22 +129,10 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupSleep(view: View) {
-        val seekBar = view.findViewById<SeekBar>(R.id.seekSleep)
-        val label = view.findViewById<TextView>(R.id.valSleep)
-        val current = preferences.sleepTimeout
-        seekBar.progress = current - 1
-        label.text = "${current}분"
-
-        seekBar.setOnSeekBarChangeListener(object : SimpleSeekBarListener() {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                val value = progress + 1
-                label.text = "${value}분"
-                if (fromUser) {
-                    preferences.sleepTimeout = value
-                    sendSettings()
-                }
-            }
-        })
+        bindSeekBar(view, R.id.seekSleep, R.id.valSleep,
+            currentValue = preferences.sleepTimeout, offset = 1,
+            formatLabel = { "${it}분" },
+            onChanged = { preferences.sleepTimeout = it })
     }
 
     private fun sendSettings() {

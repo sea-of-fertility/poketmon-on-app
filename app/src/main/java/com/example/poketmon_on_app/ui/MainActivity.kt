@@ -168,17 +168,8 @@ class MainActivity : AppCompatActivity() {
         val statusText = findViewById<TextView>(R.id.statusText)
         val btnSleep = findViewById<MaterialButton>(R.id.btnSleep)
 
-        val stateLabel = when (currentPetState) {
-            PetState.IDLE -> "대기 중"
-            PetState.WALK -> "걷는 중"
-            PetState.RUN -> "뛰는 중"
-            PetState.SLEEP -> "자는 중"
-            PetState.REACTION -> "반응 중"
-            PetState.DRAGGED -> "드래그 중"
-        }
-
         if (serviceRunning) {
-            statusText.text = "상태: $stateLabel"
+            statusText.text = "상태: ${currentPetState.displayLabel}"
         }
 
         btnSleep.text = if (currentPetState == PetState.SLEEP) "깨우기" else "재우기"

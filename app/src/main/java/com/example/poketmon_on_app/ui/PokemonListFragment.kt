@@ -89,33 +89,26 @@ class PokemonListFragment : Fragment() {
         filterBtn.setOnClickListener { showTypeBottomSheet(view) }
     }
 
-    private fun showGenBottomSheet(rootView: View) {
+    private fun <T> showFilterBottomSheet(
+        rootView: View,
+        layoutRes: Int,
+        chipGroupId: Int,
+        items: List<T>,
+        currentSelection: Set<T>,
+        colorMap: Map<T, String>,
+        labelOf: (T) -> String,
+        onApply: (MutableSet<T>) -> Unit
+    ) {
         val dialog = BottomSheetDialog(requireContext())
-        val sheet = layoutInflater.inflate(R.layout.bottom_sheet_gen_filter, null)
+        val sheet = layoutInflater.inflate(layoutRes, null)
         dialog.setContentView(sheet)
 
-        val chipGroup = sheet.findViewById<ChipGroup>(R.id.bsGenChipGroup)
-        val tempSelected = selectedGens.toMutableSet()
+        val chipGroup = sheet.findViewById<ChipGroup>(chipGroupId)
+        val tempSelected = currentSelection.toMutableSet()
 
-        for (gen in repository.getGenerations()) {
-            val color = Color.parseColor(genColors[gen] ?: "#888888")
-            val chip = Chip(requireContext()).apply {
-                text = "${gen}세대"
-                isCheckable = true
-                isChecked = gen in tempSelected
-                tag = gen
-                chipBackgroundColor = ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(color, Color.WHITE)
-                )
-                setTextColor(ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(Color.WHITE, color)
-                ))
-                chipStrokeWidth = 1.5f * resources.displayMetrics.density
-                chipStrokeColor = ColorStateList.valueOf(color)
-            }
-            chipGroup.addView(chip)
+        for (item in items) {
+            val color = Color.parseColor(colorMap[item] ?: "#888888")
+            chipGroup.addView(createFilterChip(labelOf(item), item, item in tempSelected, color))
         }
 
         sheet.findViewById<View>(R.id.bsResetBtn).setOnClickListener {
@@ -129,106 +122,88 @@ class PokemonListFragment : Fragment() {
             tempSelected.clear()
             for (i in 0 until group.childCount) {
                 val chip = group.getChildAt(i) as? Chip ?: continue
-                if (chip.isChecked) tempSelected.add(chip.tag as Int)
+                @Suppress("UNCHECKED_CAST")
+                if (chip.isChecked) tempSelected.add(chip.tag as T)
             }
         }
 
         sheet.findViewById<View>(R.id.bsApplyBtn).setOnClickListener {
-            selectedGens = tempSelected
-            updateSelectedTags(rootView)
+            onApply(tempSelected)
+            updateFilterButtonStates(rootView)
             applyFilter()
             dialog.dismiss()
         }
 
         dialog.show()
+    }
+
+    private fun <T> createFilterChip(label: String, tag: T, checked: Boolean, color: Int): Chip {
+        return Chip(requireContext()).apply {
+            text = label
+            isCheckable = true
+            isChecked = checked
+            this.tag = tag
+            chipBackgroundColor = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(color, Color.WHITE)
+            )
+            setTextColor(ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Color.WHITE, color)
+            ))
+            chipStrokeWidth = 1.5f * resources.displayMetrics.density
+            chipStrokeColor = ColorStateList.valueOf(color)
+        }
+    }
+
+    private fun showGenBottomSheet(rootView: View) {
+        showFilterBottomSheet(
+            rootView = rootView,
+            layoutRes = R.layout.bottom_sheet_gen_filter,
+            chipGroupId = R.id.bsGenChipGroup,
+            items = repository.getGenerations(),
+            currentSelection = selectedGens,
+            colorMap = genColors,
+            labelOf = { "${it}세대" },
+            onApply = { selectedGens = it }
+        )
     }
 
     private fun showTypeBottomSheet(rootView: View) {
-        val dialog = BottomSheetDialog(requireContext())
-        val sheet = layoutInflater.inflate(R.layout.bottom_sheet_type_filter, null)
-        dialog.setContentView(sheet)
-
-        val chipGroup = sheet.findViewById<ChipGroup>(R.id.bsTypeChipGroup)
-        val tempSelected = selectedTypes.toMutableSet()
-
-        for (type in repository.getAllTypes()) {
-            val color = Color.parseColor(typeColors[type] ?: "#888888")
-            val chip = Chip(requireContext()).apply {
-                text = type
-                isCheckable = true
-                isChecked = type in tempSelected
-                tag = type
-                chipBackgroundColor = ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(color, Color.WHITE)
-                )
-                setTextColor(ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(Color.WHITE, color)
-                ))
-                chipStrokeWidth = 1.5f * resources.displayMetrics.density
-                chipStrokeColor = ColorStateList.valueOf(color)
-            }
-            chipGroup.addView(chip)
-        }
-
-        sheet.findViewById<View>(R.id.bsResetBtn).setOnClickListener {
-            for (i in 0 until chipGroup.childCount) {
-                (chipGroup.getChildAt(i) as? Chip)?.isChecked = false
-            }
-            tempSelected.clear()
-        }
-
-        chipGroup.setOnCheckedStateChangeListener { group, _ ->
-            tempSelected.clear()
-            for (i in 0 until group.childCount) {
-                val chip = group.getChildAt(i) as? Chip ?: continue
-                if (chip.isChecked) tempSelected.add(chip.tag as String)
-            }
-        }
-
-        sheet.findViewById<View>(R.id.bsApplyBtn).setOnClickListener {
-            selectedTypes = tempSelected
-            updateSelectedTags(rootView)
-            applyFilter()
-            dialog.dismiss()
-        }
-
-        dialog.show()
+        showFilterBottomSheet(
+            rootView = rootView,
+            layoutRes = R.layout.bottom_sheet_type_filter,
+            chipGroupId = R.id.bsTypeChipGroup,
+            items = repository.getAllTypes(),
+            currentSelection = selectedTypes,
+            colorMap = typeColors,
+            labelOf = { it },
+            onApply = { selectedTypes = it }
+        )
     }
 
-    private fun updateSelectedTags(view: View) {
+    private fun updateFilterButtonStates(view: View) {
         val genBtn = view.findViewById<MaterialButton>(R.id.genFilterBtn)
         val typeBtn = view.findViewById<MaterialButton>(R.id.typeFilterBtn)
+        styleFilterButton(genBtn, "세대", selectedGens.size)
+        styleFilterButton(typeBtn, "속성", selectedTypes.size)
+    }
 
+    private fun styleFilterButton(button: MaterialButton, label: String, count: Int) {
         val activeColor = Color.parseColor("#4CAF50")
         val defaultStroke = ColorStateList.valueOf(Color.parseColor("#DDDDDD"))
         val defaultTextColor = Color.parseColor("#555555")
 
-        // Gen button state
-        if (selectedGens.isEmpty()) {
-            genBtn.text = "세대"
-            genBtn.strokeColor = defaultStroke
-            genBtn.setTextColor(defaultTextColor)
-            genBtn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+        if (count == 0) {
+            button.text = label
+            button.strokeColor = defaultStroke
+            button.setTextColor(defaultTextColor)
+            button.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
         } else {
-            genBtn.text = "세대 ${selectedGens.size}"
-            genBtn.strokeColor = ColorStateList.valueOf(activeColor)
-            genBtn.setTextColor(Color.WHITE)
-            genBtn.backgroundTintList = ColorStateList.valueOf(activeColor)
-        }
-
-        // Type button state
-        if (selectedTypes.isEmpty()) {
-            typeBtn.text = "속성"
-            typeBtn.strokeColor = defaultStroke
-            typeBtn.setTextColor(defaultTextColor)
-            typeBtn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-        } else {
-            typeBtn.text = "속성 ${selectedTypes.size}"
-            typeBtn.strokeColor = ColorStateList.valueOf(activeColor)
-            typeBtn.setTextColor(Color.WHITE)
-            typeBtn.backgroundTintList = ColorStateList.valueOf(activeColor)
+            button.text = "$label $count"
+            button.strokeColor = ColorStateList.valueOf(activeColor)
+            button.setTextColor(Color.WHITE)
+            button.backgroundTintList = ColorStateList.valueOf(activeColor)
         }
     }
 
