@@ -237,6 +237,19 @@
 9. 드래그가 여전히 정상 동작하는지 확인
 ```
 
+### 버그 수정: React 애니메이션 프레임 크기 점프
+
+**증상**: 탭 반응(Hop/Hurt/Eat) 시 프레임이 끊기는 듯한 동작. Idle↔Reaction 전환 시 스프라이트 크기가 튀었음.
+
+**원인**: `PetView.drawScaledFrame`이 프레임별 크기(`frame.width`, `frame.height`)를 기준으로 스케일을 계산했음. Idle(40×56)과 Hop(48×88) 같이 프레임 크기가 다른 애니메이션 간 전환 시 스케일 팩터가 달라져 렌더링 크기가 ~20% 점프. macOS 버전은 `spriteScale`이 모든 애니메이션에 동일하게 적용되므로 이 문제가 없었음.
+
+**수정**: `maxFrameWidth`/`maxFrameHeight`(해당 포켓몬의 모든 사용 애니메이션 중 최대 프레임 크기)를 기준으로 고정 스케일을 계산하도록 변경. 어떤 애니메이션이든 동일한 배율로 렌더링되며, 작은 프레임은 오버레이 안에서 여백이 생기고 큰 프레임은 딱 맞게 그려짐.
+
+**변경 파일**:
+- `PetView.kt` — `drawScaledFrame`에서 maxFrame 기준 고정 스케일 적용, `maxFrameWidth`/`maxFrameHeight` 프로퍼티 추가
+- `PetOverlayService.kt` — `loadPokemon`에서 `petView.maxFrameWidth`/`maxFrameHeight` 설정
+- `SpriteSheet.kt` — `maxFrameWidth`/`maxFrameHeight` 계산 (사용 애니메이션 중 최대값)
+
 ### 파일 변경
 - `PetOverlayService.kt` 수정 (터치 이벤트 분기)
 - `OverlayMenuView.kt` 신규 (팝업 메뉴)
