@@ -30,6 +30,7 @@ import com.example.poketmon_on_app.pet.PetStateMachine
 import com.example.poketmon_on_app.pet.PokemonRepository
 import com.example.poketmon_on_app.pet.SpriteSheet
 import com.example.poketmon_on_app.ui.PetView
+import android.util.Log
 import kotlin.concurrent.thread
 
 class PetOverlayService : Service() {
@@ -74,10 +75,12 @@ class PetOverlayService : Service() {
     private var touchDownTime = 0L
     private val longPressHandler = Handler(Looper.getMainLooper())
     private var longPressTriggered = false
+    private var ignoringTouch = false
 
     // Game detection
     private var isHiddenForGame = false
     private var gameCheckEnabled = false
+    private var launcherPackage: String? = null
 
     // Screen bounds
     private var screenWidth = 0
@@ -133,16 +136,23 @@ class PetOverlayService : Service() {
         }
     }
 
-    private val gameCheckRunnable = object : Runnable {
+    private val gameCheckRunnable: Runnable = object : Runnable {
         override fun run() {
             if (!gameCheckEnabled) return
-            val isGame = isForegroundAppGame()
-            if (isGame && !isHiddenForGame) {
-                hideForGame()
-            } else if (!isGame && isHiddenForGame) {
-                restoreFromGame()
+            val self = this
+            // Run UsageStats query off the main thread to avoid ANR
+            thread {
+                val isGame = isForegroundAppGame()
+                mainHandler.post {
+                    if (!gameCheckEnabled) return@post
+                    if (isGame && !isHiddenForGame) {
+                        hideForGame()
+                    } else if (!isGame && isHiddenForGame) {
+                        restoreFromGame()
+                    }
+                    mainHandler.postDelayed(self, 3000L)
+                }
             }
-            mainHandler.postDelayed(this, 3000L)
         }
     }
 
@@ -175,6 +185,9 @@ class PetOverlayService : Service() {
             addAction(Intent.ACTION_USER_PRESENT)
         }
         registerReceiver(screenReceiver, filter)
+
+        launcherPackage = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            .let { packageManager.resolveActivity(it, 0)?.activityInfo?.packageName }
 
         startGameCheckIfEnabled()
         showOverlay()
@@ -308,8 +321,16 @@ class PetOverlayService : Service() {
         }
 
         view.setOnTouchListener { v, event ->
+            Log.d("PetTouch", "action=${event.action} state=${stateMachine?.currentState} ignoringTouch=$ignoringTouch")
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    Log.d("PetTouch", "ACTION_DOWN state=${stateMachine?.currentState}")
+                    if (stateMachine?.currentState == PetState.REACTION) {
+                        ignoringTouch = true
+                        Log.d("PetTouch", "BLOCKED: ignoring touch during REACTION")
+                        return@setOnTouchListener true
+                    }
+                    ignoringTouch = false
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
@@ -321,6 +342,7 @@ class PetOverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (ignoringTouch) return@setOnTouchListener true
                     val movedX = Math.abs(event.rawX - initialTouchX)
                     val movedY = Math.abs(event.rawY - initialTouchY)
                     if (movedX > TAP_THRESHOLD || movedY > TAP_THRESHOLD) {
@@ -335,6 +357,10 @@ class PetOverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    if (ignoringTouch) {
+                        ignoringTouch = false
+                        return@setOnTouchListener true
+                    }
                     longPressHandler.removeCallbacks(longPressRunnable)
                     val movedX = Math.abs(event.rawX - initialTouchX)
                     val movedY = Math.abs(event.rawY - initialTouchY)
@@ -361,12 +387,17 @@ class PetOverlayService : Service() {
         val sm = stateMachine ?: return
         val sheet = currentSheet ?: return
 
+        Log.d("PetTouch", "handleTap called, state=${sm.currentState}")
+
         if (sm.currentState == PetState.SLEEP) {
             sm.transitionTo(PetState.IDLE)
             return
         }
 
-        if (sm.currentState == PetState.REACTION || sm.currentState == PetState.DRAGGED) return
+        if (sm.currentState == PetState.REACTION || sm.currentState == PetState.DRAGGED) {
+            Log.d("PetTouch", "handleTap BLOCKED: state=${sm.currentState}")
+            return
+        }
 
         val reactions = sheet.availableReactions()
         if (reactions.isEmpty()) {
@@ -375,6 +406,7 @@ class PetOverlayService : Service() {
         }
 
         val reactionAnim = reactions.random()
+        Log.d("PetTouch", "handleTap: starting REACTION anim=$reactionAnim")
         sm.transitionTo(PetState.REACTION)
 
         petView?.apply {
@@ -648,8 +680,8 @@ class PetOverlayService : Service() {
         val foreground = stats.maxByOrNull { it.lastTimeUsed } ?: return false
         val pkg = foreground.packageName
 
-        // Don't hide for our own app or system UI
-        if (pkg == packageName || pkg == "com.android.systemui" || pkg == "com.android.launcher") return false
+        // Don't hide for our own app, system UI, or launcher
+        if (pkg == packageName || pkg == "com.android.systemui" || pkg == launcherPackage) return false
 
         return try {
             val appInfo = packageManager.getApplicationInfo(pkg, 0)
