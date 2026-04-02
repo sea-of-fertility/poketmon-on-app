@@ -16,6 +16,7 @@ class PetView(context: Context) : View(context) {
     private var currentAnim = "Idle"
     private var currentFrame = 0
     private var directionRow = 0 // 0=Down
+    var speedMultiplier = 1.0f
 
     private val paint = Paint().apply {
         isFilterBitmap = false // nearest-neighbor for pixel art
@@ -75,7 +76,7 @@ class PetView(context: Context) : View(context) {
         val sheet = spriteSheet ?: return 133L
         val info = sheet.anims[currentAnim] ?: return 133L
         val durationTicks = info.durations.getOrElse(currentFrame % info.durations.size) { 8 }
-        return (durationTicks * 1000L / 60L).coerceAtLeast(16L)
+        return ((durationTicks * 1000L / 60L) / speedMultiplier.coerceAtLeast(0.1f)).toLong().coerceAtLeast(16L)
     }
 
     override fun onDraw(canvas: Canvas) {
