@@ -6,7 +6,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(~/Library/Android/sdk/platform-tools/adb shell:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(wc:*)"
     ]
   }
 }
