@@ -171,4 +171,13 @@ class SpriteSheet(context: Context, pokemonId: Int) {
         val info = anims[animName] ?: return 0
         return info.durations.size
     }
+
+    /**
+     * Returns the max frame dimension (width or height) across all available animations.
+     * Used for sizing the overlay window proportionally to the Pokemon's actual sprite size.
+     */
+    fun getMaxFrameDimension(): Int {
+        return availableAnims.mapNotNull { anims[it] }
+            .maxOfOrNull { maxOf(it.frameWidth, it.frameHeight) } ?: 48
+    }
 }

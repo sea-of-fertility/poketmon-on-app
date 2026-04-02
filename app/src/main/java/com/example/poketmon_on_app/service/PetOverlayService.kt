@@ -187,16 +187,10 @@ class PetOverlayService : Service() {
     }
 
     private fun applySettings() {
-        val scale = preferences.scale / 100f
         val opacity = preferences.opacity / 100f
 
-        // Update overlay size
-        val newSize = (200 * scale).toInt()
-        layoutParams?.let { params ->
-            params.width = newSize
-            params.height = newSize
-            petView?.let { windowManager.updateViewLayout(it, params) }
-        }
+        // Resize overlay using sprite scale formula
+        resizeOverlay()
 
         // Update opacity
         petView?.alpha = opacity
@@ -207,6 +201,35 @@ class PetOverlayService : Service() {
             activityLevel = preferences.activityLevel
             sleepTimeoutMs = preferences.sleepTimeout * 60 * 1000L
         }
+    }
+
+    /**
+     * spriteScale = (screenHeight / 450.0) × (userScale / 100.0)
+     * overlaySize = maxFrameDimension × spriteScale
+     */
+    private fun resizeOverlay() {
+        val sheet = currentSheet ?: return
+        val params = layoutParams ?: return
+        val view = petView ?: return
+
+        val baseScale = screenHeight / 450.0
+        val userScale = preferences.scale / 100.0
+        val spriteScale = baseScale * userScale
+        val maxDim = sheet.getMaxFrameDimension()
+        val newSize = (maxDim * spriteScale).toInt().coerceAtLeast(24)
+
+        params.width = newSize
+        params.height = newSize
+
+        // Keep within screen bounds after resize
+        if (params.x + newSize > screenWidth) params.x = screenWidth - newSize
+        if (params.y + newSize > screenHeight) params.y = screenHeight - newSize
+        if (params.x < 0) params.x = 0
+        if (params.y < 0) params.y = 0
+
+        try {
+            windowManager.updateViewLayout(view, params)
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
@@ -225,10 +248,10 @@ class PetOverlayService : Service() {
     private fun showOverlay() {
         val view = PetView(this)
 
-        val size = 200
+        val initialSize = 200 // placeholder — resized in loadPokemon → applySettings
         val params = WindowManager.LayoutParams(
-            size,
-            size,
+            initialSize,
+            initialSize,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
@@ -297,6 +320,8 @@ class PetOverlayService : Service() {
             sm.transitionTo(PetState.IDLE)
             return
         }
+
+        if (sm.currentState == PetState.REACTION || sm.currentState == PetState.DRAGGED) return
 
         val reactions = sheet.availableReactions()
         if (reactions.isEmpty()) {
@@ -394,7 +419,7 @@ class PetOverlayService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = params.x
-            y = params.y - 200
+            y = params.y - params.height
         }
 
         windowManager.addView(menu, menuP)

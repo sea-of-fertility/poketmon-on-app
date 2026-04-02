@@ -17,6 +17,7 @@ class PetView(context: Context) : View(context) {
     private var currentFrame = 0
     private var directionRow = 0 // 0=Down
     var speedMultiplier = 1.0f
+    private var maxFrameDim = 48
 
     private val paint = Paint().apply {
         isFilterBitmap = false // nearest-neighbor for pixel art
@@ -38,6 +39,7 @@ class PetView(context: Context) : View(context) {
 
     fun setSpriteSheet(sheet: SpriteSheet) {
         spriteSheet = sheet
+        maxFrameDim = sheet.getMaxFrameDimension()
         currentFrame = 0
     }
 
@@ -87,11 +89,11 @@ class PetView(context: Context) : View(context) {
     }
 
     private fun drawScaledFrame(canvas: Canvas, frame: Bitmap) {
-        val scale = (width.toFloat() / frame.width).coerceAtMost(height.toFloat() / frame.height)
-        val scaledW = (frame.width * scale).toInt()
-        val scaledH = (frame.height * scale).toInt()
+        val perPixelScale = width.toFloat() / maxFrameDim
+        val scaledW = (frame.width * perPixelScale).toInt()
+        val scaledH = (frame.height * perPixelScale).toInt()
         val left = (width - scaledW) / 2
-        val top = (height - scaledH) / 2
+        val top = height - scaledH
         val destRect = Rect(left, top, left + scaledW, top + scaledH)
         canvas.drawBitmap(frame, null, destRect, paint)
     }
