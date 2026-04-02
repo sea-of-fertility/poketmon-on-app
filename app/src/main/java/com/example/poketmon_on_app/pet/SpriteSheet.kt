@@ -18,13 +18,54 @@ class SpriteSheet(context: Context, pokemonId: Int) {
     private val folder = String.format("Sprites/%04d", pokemonId)
     val anims: Map<String, AnimInfo>
     private val sheets = mutableMapOf<String, Bitmap>()
+    private val availableAnims: Set<String>
 
     init {
         anims = parseAnimData(context)
-        // Preload essential sheets
+        availableAnims = checkAvailableAnims(context)
         for (name in listOf("Walk", "Idle", "Sleep")) {
             loadSheet(context, name)
         }
+    }
+
+    private fun checkAvailableAnims(context: Context): Set<String> {
+        val result = mutableSetOf<String>()
+        val files = try {
+            context.assets.list(folder) ?: emptyArray()
+        } catch (_: Exception) {
+            emptyArray()
+        }
+        for (file in files) {
+            if (file.endsWith("-Anim.png")) {
+                result.add(file.removeSuffix("-Anim.png"))
+            }
+        }
+        return result
+    }
+
+    fun hasAnimation(name: String): Boolean = name in availableAnims
+
+    /**
+     * Resolve animation with fallback chain:
+     * - Idle not available → Walk
+     * - Walk not available → Idle
+     * - Sleep not available → resolved Idle
+     */
+    fun resolveAnimation(name: String): String? {
+        if (name in availableAnims) return name
+        return when (name) {
+            "Idle" -> if ("Walk" in availableAnims) "Walk" else null
+            "Walk" -> if ("Idle" in availableAnims) "Idle" else null
+            "Sleep" -> resolveAnimation("Idle")
+            else -> null
+        }
+    }
+
+    /**
+     * Available reaction animations (Hop, Hurt, Eat) that actually have sprite sheets.
+     */
+    fun availableReactions(): List<String> {
+        return listOf("Hop", "Hurt", "Eat").filter { it in availableAnims }
     }
 
     private fun parseAnimData(context: Context): Map<String, AnimInfo> {
@@ -94,17 +135,17 @@ class SpriteSheet(context: Context, pokemonId: Int) {
             val bmp = BitmapFactory.decodeStream(input, null, opts)
             input.close()
             bmp?.also { sheets[animName] = it }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
 
-    /**
-     * Extract a single frame from the sprite sheet.
-     * @param animName e.g. "Walk", "Idle"
-     * @param frameIndex column index
-     * @param directionRow row index (0=Down, 1=DownRight, ... 7=DownLeft)
-     */
+    private val frameCache = mutableMapOf<Long, Bitmap>()
+
+    private fun frameCacheKey(animIndex: Int, frameIndex: Int, directionRow: Int): Long {
+        return (animIndex.toLong() shl 32) or (directionRow.toLong() shl 16) or frameIndex.toLong()
+    }
+
     fun getFrame(context: Context, animName: String, frameIndex: Int, directionRow: Int): Bitmap? {
         val info = anims[animName] ?: return null
         val sheet = loadSheet(context, animName) ?: return null
@@ -114,11 +155,16 @@ class SpriteSheet(context: Context, pokemonId: Int) {
         val col = frameIndex % totalCols
         val row = if (directionRow < totalRows) directionRow else 0
 
+        val key = frameCacheKey(anims.keys.indexOf(animName), col, row)
+        frameCache[key]?.let { return it }
+
         val x = col * info.frameWidth
         val y = row * info.frameHeight
         if (x + info.frameWidth > sheet.width || y + info.frameHeight > sheet.height) return null
 
-        return Bitmap.createBitmap(sheet, x, y, info.frameWidth, info.frameHeight)
+        val frame = Bitmap.createBitmap(sheet, x, y, info.frameWidth, info.frameHeight)
+        frameCache[key] = frame
+        return frame
     }
 
     fun getFrameCount(animName: String): Int {
