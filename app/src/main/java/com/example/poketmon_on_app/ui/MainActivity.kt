@@ -133,7 +133,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnWalk.setOnClickListener {
-            if (currentPetState == PetState.WALK || currentPetState == PetState.RUN) {
+            if (currentPetState == PetState.WALK) {
+                sendCommand("run")
+            } else if (currentPetState == PetState.RUN) {
                 sendCommand("walk")
             } else {
                 sendCommand("walk")

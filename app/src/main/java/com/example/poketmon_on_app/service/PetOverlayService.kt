@@ -57,6 +57,7 @@ class PetOverlayService : Service() {
     private var layoutParams: WindowManager.LayoutParams? = null
     private var stateMachine: PetStateMachine? = null
     private var currentSheet: SpriteSheet? = null
+    private var currentAnimName: String = "Idle"
 
     // Menu
     private var menuView: View? = null
@@ -203,33 +204,50 @@ class PetOverlayService : Service() {
         }
     }
 
+    private fun getSpriteScale(): Double {
+        val baseScale = screenHeight / 450.0
+        val userScale = preferences.scale / 100.0
+        return baseScale * userScale
+    }
+
     /**
-     * spriteScale = (screenHeight / 450.0) × (userScale / 100.0)
-     * overlaySize = maxFrameDimension × spriteScale
+     * Resize overlay to match the current animation's frame size × spriteScale.
+     * Maintains bottom-center anchor so feet stay in place.
      */
-    private fun resizeOverlay() {
+    private fun resizeForAnimation(animName: String) {
         val sheet = currentSheet ?: return
         val params = layoutParams ?: return
         val view = petView ?: return
+        val info = sheet.anims[animName] ?: return
 
-        val baseScale = screenHeight / 450.0
-        val userScale = preferences.scale / 100.0
-        val spriteScale = baseScale * userScale
-        val maxDim = sheet.getMaxFrameDimension()
-        val newSize = (maxDim * spriteScale).toInt().coerceAtLeast(24)
+        val spriteScale = getSpriteScale()
+        val newWidth = (info.frameWidth * spriteScale).toInt().coerceAtLeast(24)
+        val newHeight = (info.frameHeight * spriteScale).toInt().coerceAtLeast(24)
 
-        params.width = newSize
-        params.height = newSize
+        // Bottom-center anchor: keep feet position fixed
+        val oldCenterX = params.x + params.width / 2
+        val oldBottomY = params.y + params.height
 
-        // Keep within screen bounds after resize
-        if (params.x + newSize > screenWidth) params.x = screenWidth - newSize
-        if (params.y + newSize > screenHeight) params.y = screenHeight - newSize
+        params.width = newWidth
+        params.height = newHeight
+        params.x = oldCenterX - newWidth / 2
+        params.y = oldBottomY - newHeight
+
+        // Keep within screen bounds
+        if (params.x + newWidth > screenWidth) params.x = screenWidth - newWidth
+        if (params.y + newHeight > screenHeight) params.y = screenHeight - newHeight
         if (params.x < 0) params.x = 0
         if (params.y < 0) params.y = 0
+
+        currentAnimName = animName
 
         try {
             windowManager.updateViewLayout(view, params)
         } catch (_: Exception) {}
+    }
+
+    private fun resizeOverlay() {
+        resizeForAnimation(currentAnimName)
     }
 
     override fun onDestroy() {
@@ -336,6 +354,7 @@ class PetOverlayService : Service() {
             setAnimation(reactionAnim)
             speedMultiplier = 1.0f
         }
+        resizeForAnimation(reactionAnim)
 
         // Return to idle after animation plays once
         val info = sheet.anims[reactionAnim]
@@ -489,6 +508,7 @@ class PetOverlayService : Service() {
                         setAnimation(animName)
                         speedMultiplier = stateMachine?.getSpeedMultiplier() ?: 1.0f
                     }
+                    resizeForAnimation(animName)
                     broadcastState(state)
                 }
                 stateMachine = sm
