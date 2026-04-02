@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=400, user-scalable=no">
+<title>PokePet Mock UI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: #f5f5f5; }
+
+  .phone {
+    width: 390px; height: 844px;
+    background: #fff; margin: 20px auto;
+    border-radius: 40px; border: 4px solid #222;
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    position: relative;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 54px; background: #fff;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 8px; font-size: 12px; color: #333; font-weight: 600;
+  }
+  .notch {
+    width: 120px; height: 30px; background: #222;
+    border-radius: 0 0 20px 20px; position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* Preview area */
+  .preview {
+    background: linear-gradient(135deg, #e8f5e9, #e3f2fd);
+    padding: 24px 20px 20px; text-align: center;
+    flex-shrink: 0;
+  }
+  .preview-sprite {
+    width: 120px; height: 120px; margin: 0 auto 12px;
+    background: #fff; border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    image-rendering: pixelated;
+    font-size: 64px;
+  }
+  .pokemon-name { font-size: 18px; font-weight: 700; color: #333; }
+  .pokemon-id { font-size: 13px; color: #888; margin-top: 2px; }
+
+  .action-row {
+    display: flex; gap: 10px; margin-top: 16px; padding: 0 8px;
+  }
+  .btn-primary {
+    flex: 1; padding: 12px; border: none; border-radius: 12px;
+    background: #4CAF50; color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary.stop { background: #f44336; }
+  .btn-secondary {
+    padding: 12px 16px; border: 2px solid #ddd; border-radius: 12px;
+    background: #fff; font-size: 15px; cursor: pointer; color: #555;
+  }
+
+  /* Segmented Control */
+  .segmented-control {
+    display: flex; margin-top: 16px; padding: 0 8px;
+    background: #e0e0e0; border-radius: 12px; padding: 3px;
+    position: relative;
+  }
+  .segment-btn {
+    flex: 1; padding: 10px 0; border: none; background: transparent;
+    font-size: 14px; font-weight: 600; color: #666;
+    border-radius: 10px; cursor: pointer; transition: all 0.2s;
+    position: relative; z-index: 1;
+  }
+  .segment-btn.active {
+    background: #fff; color: #333;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex; border-bottom: 2px solid #eee; flex-shrink: 0;
+  }
+  .tab {
+    flex: 1; padding: 14px; text-align: center; font-size: 14px;
+    font-weight: 600; color: #999; cursor: pointer; border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab.active { color: #4CAF50; border-bottom-color: #4CAF50; }
+
+  /* Tab content */
+  .tab-content { flex: 1; overflow-y: auto; }
+  .tab-panel { display: none; padding: 16px 20px; }
+  .tab-panel.active { display: block; }
+
+  /* Pokemon grid */
+  .filter-row {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .filter-chip {
+    padding: 6px 14px; border-radius: 20px; font-size: 12px;
+    border: 1.5px solid #ddd; background: #fff; cursor: pointer; color: #666;
+  }
+  .filter-chip.active { background: #4CAF50; color: #fff; border-color: #4CAF50; }
+
+  .pokemon-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  .pokemon-cell {
+    aspect-ratio: 1; background: #f9f9f9; border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; cursor: pointer; border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .pokemon-cell:hover { background: #e8f5e9; }
+  .pokemon-cell.selected { border-color: #4CAF50; background: #e8f5e9; }
+  .pokemon-cell .sprite { font-size: 28px; }
+  .pokemon-cell .name { font-size: 9px; color: #888; margin-top: 2px; }
+  .pokemon-cell .num { font-size: 8px; color: #bbb; }
+
+  /* Settings */
+  .setting-group {
+    margin-bottom: 20px;
+  }
+  .setting-group-title {
+    font-size: 12px; color: #999; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .setting-item {
+    display: flex; align-items: center; padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .setting-item:last-child { border-bottom: none; }
+  .setting-label {
+    flex: 1; font-size: 15px; color: #333;
+  }
+  .setting-value {
+    font-size: 14px; color: #4CAF50; font-weight: 600;
+    margin-right: 12px; min-width: 36px; text-align: right;
+  }
+  .setting-slider {
+    width: 140px; accent-color: #4CAF50;
+  }
+  .setting-select {
+    padding: 6px 12px; border-radius: 8px; border: 1.5px solid #ddd;
+    font-size: 14px; color: #333; background: #fff;
+  }
+
+  /* Bottom nav */
+  .bottom-nav { height: 34px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; }
+  .home-indicator { width: 134px; height: 5px; background: #222; border-radius: 3px; }
+
+  /* ============ Overlay Mock ============ */
+  .overlay-demo {
+    position: fixed; top: 20px; right: 40px;
+    width: 320px; padding: 16px;
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  }
+  .overlay-demo h3 { font-size: 14px; color: #333; margin-bottom: 12px; }
+  .overlay-screen {
+    width: 100%; height: 280px;
+    background: linear-gradient(135deg, #2196F3, #9C27B0);
+    border-radius: 12px; position: relative; overflow: hidden;
+  }
+  .overlay-pet {
+    position: absolute; bottom: 80px; left: 100px;
+    width: 64px; height: 64px;
+    font-size: 48px; cursor: grab;
+    image-rendering: pixelated;
+    transition: left 0.3s, bottom 0.3s;
+  }
+  .overlay-apps {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 60px; background: rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center; gap: 20px;
+  }
+  .overlay-app-icon {
+    width: 36px; height: 36px; background: rgba(255,255,255,0.3);
+    border-radius: 10px;
+  }
+  .overlay-label {
+    font-size: 11px; color: #888; text-align: center; margin-top: 8px;
+  }
+
+  /* Long press menu mock */
+  .longpress-menu {
+    position: absolute; bottom: 150px; left: 80px;
+    background: #fff; border-radius: 12px; padding: 6px 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    display: none; min-width: 140px; z-index: 10;
+  }
+  .longpress-menu.show { display: block; }
+  .menu-item {
+    padding: 10px 16px; font-size: 13px; color: #333;
+    cursor: pointer;
+  }
+  .menu-item:hover { background: #f5f5f5; }
+  .menu-divider { height: 1px; background: #eee; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<!-- Phone Mock -->
+<div style="display: flex; gap: 40px; justify-content: center; align-items: flex-start; padding: 20px; flex-wrap: wrap;">
+
+<!-- Main Activity -->
+<div>
+  <div style="text-align:center; margin-bottom:8px; font-size:13px; color:#999;">MainActivity</div>
+  <div class="phone">
+    <div class="status-bar">18:30<div class="notch"></div></div>
+
+    <div class="preview">
+      <div class="preview-sprite" id="mainSprite">&#9889;</div>
+      <div class="pokemon-name">Pikachu</div>
+      <div class="pokemon-id">#025 &middot; Electric</div>
+      <div id="mainStatus" style="margin-top:8px; font-size:13px; color:#4CAF50; font-weight:600;">상태: 대기 중</div>
+      <div class="action-row">
+        <button class="btn-primary" id="btnToggle" onclick="toggleService()">펫 시작하기</button>
+      </div>
+      <div class="segmented-control" id="controlRow" style="display:none;">
+        <button class="segment-btn" id="btnSleepWake" onclick="toggleSleep()">재우기</button>
+        <button class="segment-btn" id="btnWalkRun" onclick="toggleWalkRun()">걷기</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('pokemon', this)">포켓몬</div>
+      <div class="tab" onclick="switchTab('settings', this)">설정</div>
+    </div>
+
+    <div class="tab-content">
+      <!-- Pokemon Tab -->
+      <div class="tab-panel active" id="tab-pokemon">
+        <div class="filter-row">
+          <div class="filter-chip active">전체</div>
+          <div class="filter-chip">1세대</div>
+          <div class="filter-chip">2세대</div>
+          <div class="filter-chip">3세대</div>
+          <div class="filter-chip">4세대</div>
+          <div class="filter-chip">5세대</div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-chip" style="background:#78C850;color:#fff;border-color:#78C850">Grass</div>
+          <div class="filter-chip" style="background:#F08030;color:#fff;border-color:#F08030">Fire</div>
+          <div class="filter-chip" style="background:#6890F0;color:#fff;border-color:#6890F0">Water</div>
+          <div class="filter-chip" style="background:#F8D030;color:#fff;border-color:#F8D030">Electric</div>
+          <div class="filter-chip">Normal</div>
+          <div class="filter-chip">...</div>
+        </div>
+        <div class="pokemon-grid" id="pokemonGrid"></div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="setting-group">
+          <div class="setting-group-title">외형</div>
+          <div class="setting-item">
+            <span class="setting-label">크기</span>
+            <span class="setting-value" id="valScale">100%</span>
+            <input type="range" class="setting-slider" min="50" max="200" value="100"
+              oninput="document.getElementById('valScale').textContent=this.value+'%'">
+          </div>
+          <div class="setting-item">
+            <span class="setting-label">불투명도</span>
+            <span class="setting-value" id="valOpacity">100%</span>
+            <input type="range" class="setting-slider" min="30" max="100" value="100"
+              oninput="document.getElementById('valOpacity').textContent=this.value+'%'">
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-group-title">행동</div>
+          <div class="setting-item">
+            <span class="setting-label">이동 속도</span>
+            <span class="setting-value" id="valSpeed">3</span>
+            <input type="range" class="setting-slider" min="1" max="5" value="3"
+              oninput="document.getElementById('valSpeed').textContent=this.value">
+          </div>
+          <div class="setting-item">
+            <span class="setting-label">활동 빈도</span>
+            <span class="setting-value" id="valFreq">3</span>
+            <input type="range" class="setting-slider" min="1" max="5" value="3"
+              oninput="document.getElementById('valFreq').textContent=this.value">
+          </div>
+          <div class="setting-item">
+            <span class="setting-label">수면 진입</span>
+            <span class="setting-value" id="valSleep">3분</span>
+            <input type="range" class="setting-slider" min="1" max="10" value="3"
+              oninput="document.getElementById('valSleep').textContent=this.value+'분'">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="bottom-nav"><div class="home-indicator"></div></div>
+  </div>
+</div>
+
+<!-- Overlay Demo -->
+<div>
+  <div style="text-align:center; margin-bottom:8px; font-size:13px; color:#999;">오버레이 동작</div>
+  <div class="phone">
+    <div class="status-bar">18:30<div class="notch"></div></div>
+    <div style="flex:1; background: linear-gradient(135deg, #1a237e, #4a148c); position: relative; overflow: hidden;">
+
+      <!-- Fake home screen icons -->
+      <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:16px; padding:30px 24px;">
+        <div style="text-align:center" class="fake-icon"><div style="width:52px;height:52px;background:rgba(255,255,255,0.15);border-radius:14px;margin:0 auto 4px"></div><div style="font-size:10px;color:rgba(255,255,255,0.6)">Phone</div></div>
+        <div style="text-align:center" class="fake-icon"><div style="width:52px;height:52px;background:rgba(255,255,255,0.15);border-radius:14px;margin:0 auto 4px"></div><div style="font-size:10px;color:rgba(255,255,255,0.6)">Messages</div></div>
+        <div style="text-align:center" class="fake-icon"><div style="width:52px;height:52px;background:rgba(255,255,255,0.15);border-radius:14px;margin:0 auto 4px"></div><div style="font-size:10px;color:rgba(255,255,255,0.6)">Camera</div></div>
+        <div style="text-align:center" class="fake-icon"><div style="width:52px;height:52px;background:rgba(255,255,255,0.15);border-radius:14px;margin:0 auto 4px"></div><div style="font-size:10px;color:rgba(255,255,255,0.6)">Photos</div></div>
+      </div>
+
+      <!-- Pet overlay -->
+      <div class="overlay-pet" id="overlayPet"
+        onclick="handlePetClick()"
+        onmousedown="startLongPress(event)"
+        onmouseup="cancelLongPress()"
+        onmouseleave="cancelLongPress()">
+        &#9889;
+      </div>
+
+      <!-- State indicator -->
+      <div id="stateIndicator" style="position:absolute; top:80px; right:16px; background:rgba(0,0,0,0.5); color:#fff; padding:6px 12px; border-radius:8px; font-size:11px;">
+        상태: idle
+      </div>
+
+      <!-- Long press menu -->
+      <div class="longpress-menu" id="longpressMenu">
+        <div class="menu-item" id="menuSleepWake" onclick="changeState('sleep')">재우기</div>
+        <div class="menu-item" id="menuWalkRun" onclick="changeState('walk')">걷기</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="alert('포켓몬 선택기 열기')">포켓몬 변경</div>
+        <div class="menu-item" onclick="alert('설정 열기')">설정</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" style="color:#f44336" onclick="changeState('stop')">종료</div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div style="position:absolute; bottom:0; left:0; right:0; height:48px; background:rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; gap:40px;">
+        <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:8px"></div>
+        <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%"></div>
+        <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:8px"></div>
+      </div>
+    </div>
+    <div class="bottom-nav" style="background:#000;"><div class="home-indicator" style="background:#fff;"></div></div>
+  </div>
+
+  <div style="margin-top:12px; font-size:12px; color:#888; text-align:center;">
+    클릭 = reaction &middot; 길게 누르기 = 메뉴<br>
+    드래그 = 이동
+  </div>
+</div>
+
+</div>
+
+<script>
+  // Pokemon grid
+  const pokemon = [
+    {id:1, name:'Bulbasaur', emoji:'&#127793;'},
+    {id:4, name:'Charmander', emoji:'&#128293;'},
+    {id:7, name:'Squirtle', emoji:'&#128167;'},
+    {id:25, name:'Pikachu', emoji:'&#9889;'},
+    {id:39, name:'Jigglypuff', emoji:'&#127764;'},
+    {id:52, name:'Meowth', emoji:'&#128049;'},
+    {id:54, name:'Psyduck', emoji:'&#129414;'},
+    {id:58, name:'Growlithe', emoji:'&#128021;'},
+    {id:94, name:'Gengar', emoji:'&#128123;'},
+    {id:129, name:'Magikarp', emoji:'&#128031;'},
+    {id:133, name:'Eevee', emoji:'&#129418;'},
+    {id:143, name:'Snorlax', emoji:'&#128564;'},
+    {id:150, name:'Mewtwo', emoji:'&#128126;'},
+    {id:152, name:'Chikorita', emoji:'&#127807;'},
+    {id:172, name:'Pichu', emoji:'&#10024;'},
+  ];
+
+  const grid = document.getElementById('pokemonGrid');
+  pokemon.forEach(p => {
+    const cell = document.createElement('div');
+    cell.className = 'pokemon-cell' + (p.id === 25 ? ' selected' : '');
+    cell.innerHTML = `<div class="sprite">${p.emoji}</div><div class="name">${p.name}</div><div class="num">#${String(p.id).padStart(3,'0')}</div>`;
+    cell.onclick = () => {
+      document.querySelectorAll('.pokemon-cell').forEach(c => c.classList.remove('selected'));
+      cell.classList.add('selected');
+      document.querySelector('.pokemon-name').textContent = p.name;
+      document.querySelector('.pokemon-id').textContent = `#${String(p.id).padStart(3,'0')}`;
+      document.querySelector('.preview-sprite').innerHTML = p.emoji;
+      document.getElementById('overlayPet').innerHTML = p.emoji;
+    };
+    grid.appendChild(cell);
+  });
+
+  // Tab switching
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  // State labels
+  const stateLabels = {
+    idle: '대기 중',
+    walk: '걷는 중',
+    run: '뛰는 중',
+    sleep: '자는 중',
+    stop: '종료됨'
+  };
+  let currentState = 'idle';
+
+  function syncState(state) {
+    currentState = state;
+    const label = stateLabels[state] || state;
+    document.getElementById('stateIndicator').textContent = '상태: ' + label;
+    document.getElementById('mainStatus').textContent = '상태: ' + label;
+    // Toggle sleep/wake
+    const menuSW = document.getElementById('menuSleepWake');
+    const btnSW = document.getElementById('btnSleepWake');
+    if (state === 'sleep') {
+      menuSW.textContent = '깨우기';
+      menuSW.setAttribute('onclick', "changeState('idle')");
+      if (btnSW) { btnSW.textContent = '깨우기'; btnSW.classList.add('active'); }
+    } else {
+      menuSW.textContent = '재우기';
+      menuSW.setAttribute('onclick', "changeState('sleep')");
+      if (btnSW) { btnSW.textContent = '재우기'; btnSW.classList.remove('active'); }
+    }
+    // Toggle walk/run
+    const menuWR = document.getElementById('menuWalkRun');
+    const btnWR = document.getElementById('btnWalkRun');
+    if (state === 'walk') {
+      if (menuWR) { menuWR.textContent = '뛰기'; menuWR.setAttribute('onclick', "changeState('run')"); }
+      if (btnWR) { btnWR.textContent = '뛰기'; btnWR.classList.add('active'); }
+    } else if (state === 'run') {
+      if (menuWR) { menuWR.textContent = '걷기'; menuWR.setAttribute('onclick', "changeState('walk')"); }
+      if (btnWR) { btnWR.textContent = '걷기'; btnWR.classList.add('active'); }
+    } else {
+      if (menuWR) { menuWR.textContent = '걷기'; menuWR.setAttribute('onclick', "changeState('walk')"); }
+      if (btnWR) { btnWR.textContent = '걷기'; btnWR.classList.remove('active'); }
+    }
+  }
+
+  function setMainState(state) {
+    syncState(state);
+  }
+
+  function toggleSleep() {
+    if (currentState === 'sleep') {
+      syncState('idle');
+    } else {
+      syncState('sleep');
+    }
+  }
+
+  function toggleWalkRun() {
+    if (currentState === 'run') {
+      syncState('walk');
+    } else if (currentState === 'walk') {
+      syncState('run');
+    } else {
+      syncState('walk');
+    }
+  }
+
+  // Service toggle
+  let running = false;
+  function toggleService() {
+    running = !running;
+    const btn = document.getElementById('btnToggle');
+    const controlRow = document.getElementById('controlRow');
+    if (running) {
+      btn.textContent = '펫 중지하기';
+      btn.classList.add('stop');
+      controlRow.style.display = 'flex';
+      syncState('idle');
+    } else {
+      btn.textContent = '펫 시작하기';
+      btn.classList.remove('stop');
+      controlRow.style.display = 'none';
+      document.getElementById('mainStatus').textContent = '';
+    }
+  }
+
+  // Overlay interactions
+  let longPressTimer = null;
+  function startLongPress(e) {
+    longPressTimer = setTimeout(() => {
+      document.getElementById('longpressMenu').classList.add('show');
+    }, 500);
+  }
+  function cancelLongPress() {
+    clearTimeout(longPressTimer);
+  }
+  function handlePetClick() {
+    if (document.getElementById('longpressMenu').classList.contains('show')) {
+      document.getElementById('longpressMenu').classList.remove('show');
+      return;
+    }
+    const states = ['Eat!', 'Hop!', 'Hurt!'];
+    const s = states[Math.floor(Math.random() * states.length)];
+    document.getElementById('stateIndicator').textContent = '반응: ' + s;
+    setTimeout(() => {
+      document.getElementById('stateIndicator').textContent = '상태: idle';
+    }, 1000);
+  }
+  function changeState(state) {
+    document.getElementById('longpressMenu').classList.remove('show');
+    syncState(state);
+    if (state === 'stop') {
+      document.getElementById('overlayPet').style.display = 'none';
+    }
+  }
+
+  // Close menu on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.longpress-menu') && !e.target.closest('.overlay-pet')) {
+      document.getElementById('longpressMenu').classList.remove('show');
+    }
+  });
+
+  // Filter chip toggle
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+    });
+  });
+</script>
+
+</body>
+</html>

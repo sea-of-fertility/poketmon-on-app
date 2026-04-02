@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>타입 필터 UI 비교</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: #f0f0f0; }
+
+  .header {
+    text-align: center; padding: 24px 16px 12px;
+    font-size: 18px; font-weight: 700; color: #333;
+  }
+  .subtitle {
+    text-align: center; font-size: 13px; color: #888; margin-bottom: 20px;
+  }
+
+  .phones {
+    display: flex; gap: 32px; justify-content: center;
+    align-items: flex-start; padding: 0 20px 40px; flex-wrap: wrap;
+  }
+
+  .phone-wrap {
+    text-align: center;
+  }
+  .phone-label {
+    font-size: 14px; font-weight: 700; color: #555; margin-bottom: 8px;
+  }
+  .phone-desc {
+    font-size: 11px; color: #999; margin-bottom: 8px; max-width: 390px;
+  }
+
+  .phone {
+    width: 390px; height: 844px;
+    background: #fff; margin: 0 auto;
+    border-radius: 40px; border: 4px solid #222;
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    position: relative;
+  }
+
+  .status-bar {
+    height: 54px; background: #fff;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 8px; font-size: 12px; color: #333; font-weight: 600;
+  }
+  .notch {
+    width: 120px; height: 30px; background: #222;
+    border-radius: 0 0 20px 20px; position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* Preview area */
+  .preview {
+    background: linear-gradient(135deg, #e8f5e9, #e3f2fd);
+    padding: 16px 20px; text-align: center; flex-shrink: 0;
+  }
+  .preview-sprite {
+    width: 80px; height: 80px; margin: 0 auto 8px;
+    background: #fff; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    font-size: 48px;
+  }
+  .pokemon-name { font-size: 16px; font-weight: 700; color: #333; }
+  .pokemon-id { font-size: 12px; color: #888; margin-top: 2px; }
+
+  .tabs {
+    display: flex; border-bottom: 2px solid #eee; flex-shrink: 0;
+  }
+  .tab {
+    flex: 1; padding: 12px; text-align: center; font-size: 14px;
+    font-weight: 600; color: #999; cursor: pointer;
+    border-bottom: 3px solid transparent; transition: all 0.2s;
+  }
+  .tab.active { color: #4CAF50; border-bottom-color: #4CAF50; }
+
+  .tab-content { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+  /* Search */
+  .search-input {
+    width: 100%; padding: 10px 14px; border-radius: 10px;
+    border: 1.5px solid #e0e0e0; font-size: 14px; color: #333;
+    background: #f9f9f9; margin-bottom: 8px; outline: none;
+  }
+  .search-input:focus { border-color: #4CAF50; background: #fff; }
+
+  /* Gen chips row */
+  .gen-row {
+    display: flex; gap: 6px; margin-bottom: 8px;
+    overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
+  }
+  .gen-row::-webkit-scrollbar { display: none; }
+  .gen-chip {
+    padding: 5px 12px; border-radius: 16px; font-size: 12px;
+    border: 1.5px solid #ddd; background: #fff; cursor: pointer;
+    color: #666; white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+  }
+  .gen-chip.active { background: #4CAF50; color: #fff; border-color: #4CAF50; }
+
+  /* Pokemon grid */
+  .pokemon-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  }
+  .pokemon-cell {
+    aspect-ratio: 1; background: #f9f9f9; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; cursor: pointer; border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .pokemon-cell:hover { background: #e8f5e9; }
+  .pokemon-cell.selected { border-color: #4CAF50; background: #e8f5e9; }
+  .pokemon-cell .sprite { font-size: 24px; }
+  .pokemon-cell .name { font-size: 8px; color: #888; margin-top: 2px; }
+
+  .bottom-nav { height: 34px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; }
+  .home-indicator { width: 134px; height: 5px; background: #222; border-radius: 3px; }
+
+  /* ========== Option A: Inline chips + "..." ========== */
+  .type-inline-row {
+    display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+    overflow: hidden; flex-wrap: nowrap; min-height: 32px;
+  }
+  .type-chip {
+    padding: 5px 10px; border-radius: 16px; font-size: 11px;
+    border: 1.5px solid; cursor: pointer; white-space: nowrap;
+    flex-shrink: 0; transition: all 0.15s; font-weight: 500;
+  }
+  .type-chip.selected {
+    color: #fff !important; opacity: 1;
+  }
+  .type-chip:not(.selected) {
+    background: #fff !important; opacity: 0.7;
+  }
+  .more-btn {
+    padding: 5px 10px; border-radius: 16px; font-size: 12px;
+    border: 1.5px solid #ccc; background: #f0f0f0; cursor: pointer;
+    color: #555; white-space: nowrap; flex-shrink: 0; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .more-btn:hover { background: #e0e0e0; }
+
+  /* Dropdown panel (Option A) */
+  .dropdown-panel {
+    display: none;
+    background: #fff; border: 1.5px solid #e0e0e0; border-radius: 12px;
+    padding: 12px; margin-bottom: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    flex-wrap: wrap; gap: 6px;
+    animation: slideDown 0.2s ease;
+  }
+  .dropdown-panel.show { display: flex; }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ========== Option B: Filter button + BottomSheet ========== */
+  .filter-btn-row {
+    display: flex; gap: 8px; margin-bottom: 8px; align-items: center;
+  }
+  .filter-button {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px; font-size: 13px;
+    border: 1.5px solid #ddd; background: #fff; cursor: pointer;
+    color: #555; font-weight: 600; transition: all 0.15s;
+  }
+  .filter-button:hover { background: #f5f5f5; }
+  .filter-button.has-filter { border-color: #4CAF50; color: #4CAF50; }
+  .filter-button .icon { font-size: 15px; }
+  .filter-badge {
+    background: #4CAF50; color: #fff; border-radius: 50%;
+    width: 18px; height: 18px; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .selected-type-tags {
+    display: flex; gap: 4px; overflow-x: auto; flex: 1;
+    scrollbar-width: none;
+  }
+  .selected-type-tags::-webkit-scrollbar { display: none; }
+  .selected-tag {
+    padding: 4px 10px; border-radius: 14px; font-size: 11px;
+    color: #fff; white-space: nowrap; flex-shrink: 0; font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .selected-tag .remove {
+    cursor: pointer; font-size: 13px; opacity: 0.8; font-weight: 700;
+  }
+  .selected-tag .remove:hover { opacity: 1; }
+
+  /* BottomSheet */
+  .bottomsheet-overlay {
+    display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.35); z-index: 10;
+    animation: fadeIn 0.2s ease;
+  }
+  .bottomsheet-overlay.show { display: block; }
+  @keyframes fadeIn {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+
+  .bottomsheet {
+    position: absolute; bottom: 34px; left: 0; right: 0;
+    background: #fff; border-radius: 20px 20px 0 0;
+    padding: 20px 16px 24px; z-index: 11;
+    transform: translateY(100%); transition: transform 0.3s ease;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+    max-height: 60%;
+    overflow-y: auto;
+  }
+  .bottomsheet.show { transform: translateY(0); }
+  .bottomsheet-handle {
+    width: 40px; height: 4px; background: #ddd; border-radius: 2px;
+    margin: 0 auto 16px;
+  }
+  .bottomsheet-title {
+    font-size: 16px; font-weight: 700; color: #333; margin-bottom: 16px;
+  }
+  .bottomsheet-types {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .bs-type-chip {
+    padding: 8px 16px; border-radius: 20px; font-size: 13px;
+    border: 2px solid; cursor: pointer; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .bs-type-chip.selected { color: #fff !important; }
+  .bs-type-chip:not(.selected) { background: #fff !important; opacity: 0.7; }
+  .bottomsheet-actions {
+    display: flex; gap: 10px; margin-top: 20px;
+  }
+  .bs-btn {
+    flex: 1; padding: 12px; border: none; border-radius: 12px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .bs-btn-reset { background: #f0f0f0; color: #666; }
+  .bs-btn-apply { background: #4CAF50; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="header">타입 필터 UI 비교</div>
+<div class="subtitle">두 가지 방식을 직접 클릭해서 비교해보세요</div>
+
+<div class="phones">
+
+<!-- ========== Option A: Inline + "..." ========== -->
+<div class="phone-wrap">
+  <div class="phone-label">A. 한 줄 칩 + "..." 펼치기</div>
+  <div class="phone-desc">선택된 타입은 한 줄에 보이고, "..."을 누르면 전체 타입이 드롭다운으로 펼쳐짐</div>
+  <div class="phone" id="phoneA">
+    <div class="status-bar">18:30<div class="notch"></div></div>
+    <div class="preview">
+      <div class="preview-sprite">&#9889;</div>
+      <div class="pokemon-name">Pikachu</div>
+      <div class="pokemon-id">#025 &middot; Electric</div>
+    </div>
+    <div class="tabs">
+      <div class="tab active">포켓몬</div>
+      <div class="tab">설정</div>
+    </div>
+    <div class="tab-content" id="contentA">
+      <input class="search-input" placeholder="포켓몬 검색..." readonly>
+
+      <div class="gen-row">
+        <div class="gen-chip active">전체</div>
+        <div class="gen-chip">1세대</div>
+        <div class="gen-chip">2세대</div>
+        <div class="gen-chip">3세대</div>
+        <div class="gen-chip">4세대</div>
+        <div class="gen-chip">5세대</div>
+      </div>
+
+      <!-- Type inline row -->
+      <div class="type-inline-row" id="typeInlineRow">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- Dropdown panel -->
+      <div class="dropdown-panel" id="dropdownPanel">
+        <!-- filled by JS -->
+      </div>
+
+      <div class="pokemon-grid" id="gridA"></div>
+    </div>
+    <div class="bottom-nav"><div class="home-indicator"></div></div>
+  </div>
+</div>
+
+<!-- ========== Option B: Filter button + BottomSheet ========== -->
+<div class="phone-wrap">
+  <div class="phone-label">B. 필터 버튼 + BottomSheet</div>
+  <div class="phone-desc">필터 버튼을 누르면 BottomSheet에서 타입 선택, 선택된 타입은 태그로 표시</div>
+  <div class="phone" id="phoneB">
+    <div class="status-bar">18:30<div class="notch"></div></div>
+    <div class="preview">
+      <div class="preview-sprite">&#9889;</div>
+      <div class="pokemon-name">Pikachu</div>
+      <div class="pokemon-id">#025 &middot; Electric</div>
+    </div>
+    <div class="tabs">
+      <div class="tab active">포켓몬</div>
+      <div class="tab">설정</div>
+    </div>
+    <div class="tab-content" id="contentB">
+      <input class="search-input" placeholder="포켓몬 검색..." readonly>
+
+      <div class="gen-row">
+        <div class="gen-chip active">전체</div>
+        <div class="gen-chip">1세대</div>
+        <div class="gen-chip">2세대</div>
+        <div class="gen-chip">3세대</div>
+        <div class="gen-chip">4세대</div>
+        <div class="gen-chip">5세대</div>
+      </div>
+
+      <!-- Filter button row -->
+      <div class="filter-btn-row" id="filterBtnRow">
+        <button class="filter-button" id="filterBtn" onclick="openBottomSheet()">
+          <span class="icon">&#9881;</span>
+          <span>속성</span>
+        </button>
+        <div class="selected-type-tags" id="selectedTags">
+          <span style="font-size:12px; color:#aaa;">전체 속성</span>
+        </div>
+      </div>
+
+      <div class="pokemon-grid" id="gridB"></div>
+    </div>
+
+    <!-- BottomSheet overlay -->
+    <div class="bottomsheet-overlay" id="bsOverlay" onclick="closeBottomSheet()"></div>
+    <!-- BottomSheet -->
+    <div class="bottomsheet" id="bottomSheet">
+      <div class="bottomsheet-handle"></div>
+      <div class="bottomsheet-title">속성 필터</div>
+      <div class="bottomsheet-types" id="bsTypes">
+        <!-- filled by JS -->
+      </div>
+      <div class="bottomsheet-actions">
+        <button class="bs-btn bs-btn-reset" onclick="resetBottomSheet()">초기화</button>
+        <button class="bs-btn bs-btn-apply" onclick="applyBottomSheet()">적용</button>
+      </div>
+    </div>
+
+    <div class="bottom-nav"><div class="home-indicator"></div></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+  // Type data
+  const types = [
+    { name: 'Normal',   color: '#A8A878' },
+    { name: 'Fire',     color: '#F08030' },
+    { name: 'Water',    color: '#6890F0' },
+    { name: 'Grass',    color: '#78C850' },
+    { name: 'Electric', color: '#F8D030' },
+    { name: 'Ice',      color: '#98D8D8' },
+    { name: 'Fighting', color: '#C03028' },
+    { name: 'Poison',   color: '#A040A0' },
+    { name: 'Ground',   color: '#E0C068' },
+    { name: 'Flying',   color: '#A890F0' },
+    { name: 'Psychic',  color: '#F85888' },
+    { name: 'Bug',      color: '#A8B820' },
+    { name: 'Rock',     color: '#B8A038' },
+    { name: 'Ghost',    color: '#705898' },
+    { name: 'Dragon',   color: '#7038F8' },
+    { name: 'Dark',     color: '#705848' },
+    { name: 'Steel',    color: '#B8B8D0' },
+    { name: 'Fairy',    color: '#EE99AC' },
+  ];
+
+  const pokemon = [
+    {id:1, name:'Bulbasaur', emoji:'&#127793;', type:'Grass'},
+    {id:4, name:'Charmander', emoji:'&#128293;', type:'Fire'},
+    {id:7, name:'Squirtle', emoji:'&#128167;', type:'Water'},
+    {id:25, name:'Pikachu', emoji:'&#9889;', type:'Electric'},
+    {id:39, name:'Jigglypuff', emoji:'&#127764;', type:'Fairy'},
+    {id:52, name:'Meowth', emoji:'&#128049;', type:'Normal'},
+    {id:54, name:'Psyduck', emoji:'&#129414;', type:'Water'},
+    {id:58, name:'Growlithe', emoji:'&#128021;', type:'Fire'},
+    {id:66, name:'Machop', emoji:'&#128170;', type:'Fighting'},
+    {id:92, name:'Gastly', emoji:'&#128123;', type:'Ghost'},
+    {id:94, name:'Gengar', emoji:'&#128123;', type:'Ghost'},
+    {id:129, name:'Magikarp', emoji:'&#128031;', type:'Water'},
+    {id:133, name:'Eevee', emoji:'&#129418;', type:'Normal'},
+    {id:143, name:'Snorlax', emoji:'&#128564;', type:'Normal'},
+    {id:147, name:'Dratini', emoji:'&#128009;', type:'Dragon'},
+  ];
+
+  function fillGrid(containerId) {
+    const grid = document.getElementById(containerId);
+    pokemon.forEach(p => {
+      const cell = document.createElement('div');
+      cell.className = 'pokemon-cell' + (p.id === 25 ? ' selected' : '');
+      cell.innerHTML = `<div class="sprite">${p.emoji}</div><div class="name">${p.name}</div>`;
+      grid.appendChild(cell);
+    });
+  }
+  fillGrid('gridA');
+  fillGrid('gridB');
+
+  // ========== OPTION A: Inline + Dropdown ==========
+  const VISIBLE_COUNT = 4;
+  let selectedTypesA = new Set();
+  let dropdownOpen = false;
+
+  function renderInlineRow() {
+    const row = document.getElementById('typeInlineRow');
+    row.innerHTML = '';
+
+    // Show selected types first, then fill with unselected up to VISIBLE_COUNT
+    const selected = types.filter(t => selectedTypesA.has(t.name));
+    const unselected = types.filter(t => !selectedTypesA.has(t.name));
+
+    const visible = [...selected, ...unselected].slice(0, VISIBLE_COUNT);
+
+    visible.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'type-chip' + (selectedTypesA.has(t.name) ? ' selected' : '');
+      chip.style.borderColor = t.color;
+      chip.style.color = t.color;
+      if (selectedTypesA.has(t.name)) chip.style.background = t.color;
+      chip.textContent = t.name;
+      chip.onclick = () => toggleTypeA(t.name);
+      row.appendChild(chip);
+    });
+
+    // "..." button
+    const moreBtn = document.createElement('div');
+    moreBtn.className = 'more-btn';
+    const hiddenSelected = selected.filter(t => !visible.includes(t)).length;
+    moreBtn.textContent = dropdownOpen ? '접기 ▲' : `... ▼`;
+    if (selectedTypesA.size > 0) {
+      moreBtn.textContent = dropdownOpen ? '접기 ▲' : `+${types.length - VISIBLE_COUNT} ▼`;
+    }
+    moreBtn.onclick = toggleDropdown;
+    row.appendChild(moreBtn);
+  }
+
+  function renderDropdown() {
+    const panel = document.getElementById('dropdownPanel');
+    panel.innerHTML = '';
+
+    types.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'type-chip' + (selectedTypesA.has(t.name) ? ' selected' : '');
+      chip.style.borderColor = t.color;
+      chip.style.color = t.color;
+      if (selectedTypesA.has(t.name)) chip.style.background = t.color;
+      chip.textContent = t.name;
+      chip.onclick = () => toggleTypeA(t.name);
+      panel.appendChild(chip);
+    });
+  }
+
+  function toggleTypeA(name) {
+    if (selectedTypesA.has(name)) {
+      selectedTypesA.delete(name);
+    } else {
+      selectedTypesA.add(name);
+    }
+    renderInlineRow();
+    renderDropdown();
+  }
+
+  function toggleDropdown() {
+    dropdownOpen = !dropdownOpen;
+    document.getElementById('dropdownPanel').classList.toggle('show', dropdownOpen);
+    renderInlineRow();
+  }
+
+  renderInlineRow();
+  renderDropdown();
+
+  // ========== OPTION B: Filter Button + BottomSheet ==========
+  let selectedTypesB = new Set();
+  let tempSelectedB = new Set();
+
+  function openBottomSheet() {
+    tempSelectedB = new Set(selectedTypesB);
+    renderBsTypes();
+    document.getElementById('bsOverlay').classList.add('show');
+    setTimeout(() => {
+      document.getElementById('bottomSheet').classList.add('show');
+    }, 10);
+  }
+
+  function closeBottomSheet() {
+    document.getElementById('bottomSheet').classList.remove('show');
+    setTimeout(() => {
+      document.getElementById('bsOverlay').classList.remove('show');
+    }, 300);
+  }
+
+  function renderBsTypes() {
+    const container = document.getElementById('bsTypes');
+    container.innerHTML = '';
+    types.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'bs-type-chip' + (tempSelectedB.has(t.name) ? ' selected' : '');
+      chip.style.borderColor = t.color;
+      chip.style.color = t.color;
+      if (tempSelectedB.has(t.name)) chip.style.background = t.color;
+      chip.textContent = t.name;
+      chip.onclick = () => {
+        if (tempSelectedB.has(t.name)) {
+          tempSelectedB.delete(t.name);
+        } else {
+          tempSelectedB.add(t.name);
+        }
+        renderBsTypes();
+      };
+      container.appendChild(chip);
+    });
+  }
+
+  function resetBottomSheet() {
+    tempSelectedB.clear();
+    renderBsTypes();
+  }
+
+  function applyBottomSheet() {
+    selectedTypesB = new Set(tempSelectedB);
+    renderFilterBtnRow();
+    closeBottomSheet();
+  }
+
+  function renderFilterBtnRow() {
+    const btn = document.getElementById('filterBtn');
+    const tagsContainer = document.getElementById('selectedTags');
+
+    if (selectedTypesB.size > 0) {
+      btn.classList.add('has-filter');
+      btn.innerHTML = `<span class="icon">&#9881;</span><span>속성</span><span class="filter-badge">${selectedTypesB.size}</span>`;
+
+      tagsContainer.innerHTML = '';
+      selectedTypesB.forEach(name => {
+        const t = types.find(x => x.name === name);
+        const tag = document.createElement('span');
+        tag.className = 'selected-tag';
+        tag.style.background = t.color;
+        tag.innerHTML = `${t.name}<span class="remove" onclick="removeTypeB('${t.name}')">&times;</span>`;
+        tagsContainer.appendChild(tag);
+      });
+    } else {
+      btn.classList.remove('has-filter');
+      btn.innerHTML = `<span class="icon">&#9881;</span><span>속성</span>`;
+      tagsContainer.innerHTML = '<span style="font-size:12px; color:#aaa;">전체 속성</span>';
+    }
+  }
+
+  function removeTypeB(name) {
+    selectedTypesB.delete(name);
+    renderFilterBtnRow();
+  }
+
+  renderBsTypes();
+</script>
+
+</body>
+</html>

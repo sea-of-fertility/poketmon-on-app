@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew assembleDebug)",
+      "Bash(git reset:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb shell:*)",
+      "Bash(git:*)",
+      "Bash(wc:*)",
+      "Bash(python3:*)",
+      "Bash(./gradlew installDebug)"
+    ]
+  }
+}
