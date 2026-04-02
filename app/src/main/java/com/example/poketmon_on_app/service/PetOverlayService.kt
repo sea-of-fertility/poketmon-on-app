@@ -5,10 +5,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.IBinder
@@ -72,6 +75,10 @@ class PetOverlayService : Service() {
     private val longPressHandler = Handler(Looper.getMainLooper())
     private var longPressTriggered = false
 
+    // Game detection
+    private var isHiddenForGame = false
+    private var gameCheckEnabled = false
+
     // Screen bounds
     private var screenWidth = 0
     private var screenHeight = 0
@@ -86,10 +93,12 @@ class PetOverlayService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     petView?.stopAnimation()
                     mainHandler.removeCallbacks(gameLoop)
+                    mainHandler.removeCallbacks(gameCheckRunnable)
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     petView?.startAnimation()
                     mainHandler.post(gameLoop)
+                    if (gameCheckEnabled) mainHandler.post(gameCheckRunnable)
                     // Lock screen: disable touch
                     layoutParams?.let { params ->
                         params.flags = params.flags or
@@ -124,6 +133,19 @@ class PetOverlayService : Service() {
         }
     }
 
+    private val gameCheckRunnable = object : Runnable {
+        override fun run() {
+            if (!gameCheckEnabled) return
+            val isGame = isForegroundAppGame()
+            if (isGame && !isHiddenForGame) {
+                hideForGame()
+            } else if (!isGame && isHiddenForGame) {
+                restoreFromGame()
+            }
+            mainHandler.postDelayed(this, 3000L)
+        }
+    }
+
     private val longPressRunnable = Runnable {
         longPressTriggered = true
         showMenu()
@@ -154,6 +176,7 @@ class PetOverlayService : Service() {
         }
         registerReceiver(screenReceiver, filter)
 
+        startGameCheckIfEnabled()
         showOverlay()
     }
 
@@ -165,7 +188,10 @@ class PetOverlayService : Service() {
                     loadPokemon(pokemonId)
                 }
             }
-            ACTION_UPDATE_SETTINGS -> applySettings()
+            ACTION_UPDATE_SETTINGS -> {
+                applySettings()
+                startGameCheckIfEnabled()
+            }
             ACTION_COMMAND -> {
                 when (intent.getStringExtra(EXTRA_COMMAND)) {
                     "sleep" -> stateMachine?.transitionTo(PetState.SLEEP)
@@ -252,6 +278,7 @@ class PetOverlayService : Service() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacks(gameLoop)
+        mainHandler.removeCallbacks(gameCheckRunnable)
         longPressHandler.removeCallbacks(longPressRunnable)
         try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
         dismissMenu()
@@ -591,5 +618,62 @@ class PetOverlayService : Service() {
         val notification = buildNotificationWithState(state)
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    // ---- Game detection ----
+
+    private fun startGameCheckIfEnabled() {
+        mainHandler.removeCallbacks(gameCheckRunnable)
+        gameCheckEnabled = preferences.hideInGame && hasUsageStatsPermission()
+        if (gameCheckEnabled) {
+            mainHandler.post(gameCheckRunnable)
+        } else if (isHiddenForGame) {
+            restoreFromGame()
+        }
+    }
+
+    private fun hasUsageStatsPermission(): Boolean {
+        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
+        val now = System.currentTimeMillis()
+        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 60_000, now)
+        return stats != null && stats.isNotEmpty()
+    }
+
+    private fun isForegroundAppGame(): Boolean {
+        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
+        val now = System.currentTimeMillis()
+        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 60_000, now)
+        if (stats.isNullOrEmpty()) return false
+
+        val foreground = stats.maxByOrNull { it.lastTimeUsed } ?: return false
+        val pkg = foreground.packageName
+
+        // Don't hide for our own app or system UI
+        if (pkg == packageName || pkg == "com.android.systemui" || pkg == "com.android.launcher") return false
+
+        return try {
+            val appInfo = packageManager.getApplicationInfo(pkg, 0)
+            appInfo.category == ApplicationInfo.CATEGORY_GAME
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    private fun hideForGame() {
+        isHiddenForGame = true
+        petView?.apply {
+            stopAnimation()
+            visibility = View.GONE
+        }
+        mainHandler.removeCallbacks(gameLoop)
+    }
+
+    private fun restoreFromGame() {
+        isHiddenForGame = false
+        petView?.apply {
+            visibility = View.VISIBLE
+            startAnimation()
+        }
+        mainHandler.post(gameLoop)
     }
 }

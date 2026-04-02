@@ -38,6 +38,11 @@ class PetPreferences(context: Context) {
         get() = prefs.getInt("sleep_timeout", 3)
         set(value) = prefs.edit().putInt("sleep_timeout", value).apply()
 
+    // Game mode
+    var hideInGame: Boolean
+        get() = prefs.getBoolean("hide_in_game", true)
+        set(value) = prefs.edit().putBoolean("hide_in_game", value).apply()
+
     // Speed level → px/frame
     fun getMoveSpeedPx(): Float {
         return when (moveSpeedLevel) {

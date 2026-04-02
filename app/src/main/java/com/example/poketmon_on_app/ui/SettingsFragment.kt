@@ -1,13 +1,17 @@
 package com.example.poketmon_on_app.ui
 
+import android.app.AppOpsManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.example.poketmon_on_app.R
 import com.example.poketmon_on_app.pet.PetPreferences
 import com.example.poketmon_on_app.service.PetOverlayService
@@ -32,6 +36,7 @@ class SettingsFragment : Fragment() {
         setupOpacity(view)
         setupSpeed(view)
         setupFrequency(view)
+        setupHideInGame(view)
         setupSleep(view)
     }
 
@@ -111,6 +116,40 @@ class SettingsFragment : Fragment() {
                 }
             }
         })
+    }
+
+    private fun setupHideInGame(view: View) {
+        val switch = view.findViewById<SwitchMaterial>(R.id.switchHideInGame)
+        switch.isChecked = preferences.hideInGame
+
+        switch.setOnCheckedChangeListener { _, isChecked ->
+            preferences.hideInGame = isChecked
+            if (isChecked && !hasUsageStatsPermission()) {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
+            sendSettings()
+        }
+    }
+
+    private fun hasUsageStatsPermission(): Boolean {
+        val appOps = requireContext().getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        val mode = appOps.unsafeCheckOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            requireContext().packageName
+        )
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh toggle state after returning from settings
+        view?.findViewById<SwitchMaterial>(R.id.switchHideInGame)?.let { switch ->
+            if (switch.isChecked && !hasUsageStatsPermission()) {
+                switch.isChecked = false
+                preferences.hideInGame = false
+            }
+        }
     }
 
     private fun setupSleep(view: View) {
