@@ -60,6 +60,23 @@
     background: #fff; font-size: 15px; cursor: pointer; color: #555;
   }
 
+  /* Segmented Control */
+  .segmented-control {
+    display: flex; margin-top: 16px; padding: 0 8px;
+    background: #e0e0e0; border-radius: 12px; padding: 3px;
+    position: relative;
+  }
+  .segment-btn {
+    flex: 1; padding: 10px 0; border: none; background: transparent;
+    font-size: 14px; font-weight: 600; color: #666;
+    border-radius: 10px; cursor: pointer; transition: all 0.2s;
+    position: relative; z-index: 1;
+  }
+  .segment-btn.active {
+    background: #fff; color: #333;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  }
+
   /* Tabs */
   .tabs {
     display: flex; border-bottom: 2px solid #eee; flex-shrink: 0;
@@ -203,9 +220,9 @@
       <div class="action-row">
         <button class="btn-primary" id="btnToggle" onclick="toggleService()">펫 시작하기</button>
       </div>
-      <div class="action-row" id="controlRow" style="display:none;">
-        <button class="btn-secondary" id="btnSleepWake" onclick="toggleSleep()">재우기</button>
-        <button class="btn-secondary" id="btnWalkRun" onclick="toggleWalkRun()">걷기</button>
+      <div class="segmented-control" id="controlRow" style="display:none;">
+        <button class="segment-btn" id="btnSleepWake" onclick="toggleSleep()">재우기</button>
+        <button class="segment-btn" id="btnWalkRun" onclick="toggleWalkRun()">걷기</button>
       </div>
     </div>
 
@@ -406,24 +423,24 @@
     if (state === 'sleep') {
       menuSW.textContent = '깨우기';
       menuSW.setAttribute('onclick', "changeState('idle')");
-      if (btnSW) btnSW.textContent = '깨우기';
+      if (btnSW) { btnSW.textContent = '깨우기'; btnSW.classList.add('active'); }
     } else {
       menuSW.textContent = '재우기';
       menuSW.setAttribute('onclick', "changeState('sleep')");
-      if (btnSW) btnSW.textContent = '재우기';
+      if (btnSW) { btnSW.textContent = '재우기'; btnSW.classList.remove('active'); }
     }
     // Toggle walk/run
     const menuWR = document.getElementById('menuWalkRun');
     const btnWR = document.getElementById('btnWalkRun');
     if (state === 'walk') {
       if (menuWR) { menuWR.textContent = '뛰기'; menuWR.setAttribute('onclick', "changeState('run')"); }
-      if (btnWR) btnWR.textContent = '뛰기';
+      if (btnWR) { btnWR.textContent = '뛰기'; btnWR.classList.add('active'); }
     } else if (state === 'run') {
       if (menuWR) { menuWR.textContent = '걷기'; menuWR.setAttribute('onclick', "changeState('walk')"); }
-      if (btnWR) btnWR.textContent = '걷기';
+      if (btnWR) { btnWR.textContent = '걷기'; btnWR.classList.add('active'); }
     } else {
       if (menuWR) { menuWR.textContent = '걷기'; menuWR.setAttribute('onclick', "changeState('walk')"); }
-      if (btnWR) btnWR.textContent = '걷기';
+      if (btnWR) { btnWR.textContent = '걷기'; btnWR.classList.remove('active'); }
     }
   }
 
