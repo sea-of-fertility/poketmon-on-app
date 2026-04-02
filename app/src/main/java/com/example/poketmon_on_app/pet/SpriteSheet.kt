@@ -20,12 +20,20 @@ class SpriteSheet(context: Context, pokemonId: Int) {
     private val sheets = mutableMapOf<String, Bitmap>()
     private val availableAnims: Set<String>
 
+    /** 앱에서 사용하는 애니메이션 중 최대 프레임 너비/높이 (오버레이 크기 결정용) */
+    val maxFrameWidth: Int
+    val maxFrameHeight: Int
+
     init {
         anims = parseAnimData(context)
         availableAnims = checkAvailableAnims(context)
-        for (name in listOf("Walk", "Idle", "Sleep")) {
+        val usedAnims = listOf("Walk", "Idle", "Sleep", "Hop", "Hurt", "Eat")
+        for (name in usedAnims) {
             loadSheet(context, name)
         }
+        val usedInfos = usedAnims.mapNotNull { anims[it] }.filter { it.name in availableAnims }
+        maxFrameWidth = usedInfos.maxOfOrNull { it.frameWidth } ?: 40
+        maxFrameHeight = usedInfos.maxOfOrNull { it.frameHeight } ?: 40
     }
 
     private fun checkAvailableAnims(context: Context): Set<String> {

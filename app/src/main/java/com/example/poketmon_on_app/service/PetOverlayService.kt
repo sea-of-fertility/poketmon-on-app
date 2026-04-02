@@ -1,36 +1,24 @@
 package com.example.poketmon_on_app.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
-import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.TextView
-import com.example.poketmon_on_app.R
 import com.example.poketmon_on_app.pet.PetPreferences
 import com.example.poketmon_on_app.pet.PetState
 import com.example.poketmon_on_app.pet.PetStateMachine
 import com.example.poketmon_on_app.pet.PokemonRepository
 import com.example.poketmon_on_app.pet.SpriteSheet
 import com.example.poketmon_on_app.ui.PetView
-import android.util.Log
 import kotlin.concurrent.thread
 
 class PetOverlayService : Service() {
@@ -44,65 +32,45 @@ class PetOverlayService : Service() {
         const val EXTRA_POKEMON_ID = "pokemon_id"
         const val EXTRA_COMMAND = "command"
 
-        // Broadcast from service → activity
         const val BROADCAST_STATE = "com.example.poketmon_on_app.STATE_CHANGED"
         const val EXTRA_STATE = "state"
         const val ACTION_STOP = "com.example.poketmon_on_app.STOP"
         const val ACTION_TOGGLE_SLEEP = "com.example.poketmon_on_app.TOGGLE_SLEEP"
-        private const val LONG_PRESS_MS = 500L
-        private const val TAP_THRESHOLD = 10f
     }
 
     private var currentPokemonName: String = "포켓몬"
 
     private lateinit var windowManager: WindowManager
     private lateinit var preferences: PetPreferences
+    private lateinit var notificationManager: PetNotificationManager
+    private lateinit var gameDetector: GameDetector
+    private lateinit var menuManager: OverlayMenuManager
+    private lateinit var touchHandler: PetTouchHandler
+
     private var petView: PetView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var stateMachine: PetStateMachine? = null
     private var currentSheet: SpriteSheet? = null
     private var currentAnimName: String = "Idle"
 
-    // Menu
-    private var menuView: View? = null
-    private var menuParams: WindowManager.LayoutParams? = null
-
-    // Touch state
-    private var initialX = 0
-    private var initialY = 0
-    private var initialTouchX = 0f
-    private var initialTouchY = 0f
-    private var touchDownTime = 0L
-    private val longPressHandler = Handler(Looper.getMainLooper())
-    private var longPressTriggered = false
-    private var ignoringTouch = false
-
-    // Game detection
-    private var isHiddenForGame = false
-    private var gameCheckEnabled = false
-    private var launcherPackage: String? = null
-
-    // Screen bounds
     private var screenWidth = 0
     private var screenHeight = 0
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val updateIntervalMs = 50L // ~20fps — sufficient for overlay movement, avoids System UI overload
+    private val updateIntervalMs = 50L
 
-    // Screen state receiver
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     petView?.stopAnimation()
                     mainHandler.removeCallbacks(gameLoop)
-                    mainHandler.removeCallbacks(gameCheckRunnable)
+                    gameDetector.stop()
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     petView?.startAnimation()
                     mainHandler.post(gameLoop)
-                    if (gameCheckEnabled) mainHandler.post(gameCheckRunnable)
-                    // Lock screen: disable touch
+                    gameDetector.startIfEnabled(preferences.hideInGame)
                     layoutParams?.let { params ->
                         params.flags = params.flags or
                             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -111,7 +79,6 @@ class PetOverlayService : Service() {
                     }
                 }
                 Intent.ACTION_USER_PRESENT -> {
-                    // Unlocked: enable touch
                     layoutParams?.let { params ->
                         params.flags = params.flags and
                             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -130,35 +97,9 @@ class PetOverlayService : Service() {
                 moveOverlay()
                 mainHandler.postDelayed(this, updateIntervalMs)
             } else {
-                // IDLE/SLEEP/REACTION — no movement needed, poll less frequently
                 mainHandler.postDelayed(this, 500L)
             }
         }
-    }
-
-    private val gameCheckRunnable: Runnable = object : Runnable {
-        override fun run() {
-            if (!gameCheckEnabled) return
-            val self = this
-            // Run UsageStats query off the main thread to avoid ANR
-            thread {
-                val isGame = isForegroundAppGame()
-                mainHandler.post {
-                    if (!gameCheckEnabled) return@post
-                    if (isGame && !isHiddenForGame) {
-                        hideForGame()
-                    } else if (!isGame && isHiddenForGame) {
-                        restoreFromGame()
-                    }
-                    mainHandler.postDelayed(self, 3000L)
-                }
-            }
-        }
-    }
-
-    private val longPressRunnable = Runnable {
-        longPressTriggered = true
-        showMenu()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -174,11 +115,44 @@ class PetOverlayService : Service() {
         screenWidth = metrics.widthPixels
         screenHeight = metrics.heightPixels
 
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        notificationManager = PetNotificationManager(this, CHANNEL_ID, NOTIFICATION_ID)
+        notificationManager.createChannel()
+        startForeground(NOTIFICATION_ID, notificationManager.build(currentPokemonName, PetState.IDLE))
         preferences.isServiceRunning = true
 
-        // Register screen state receiver
+        menuManager = OverlayMenuManager(this, windowManager, mainHandler)
+
+        gameDetector = GameDetector(this, mainHandler,
+            onHide = {
+                petView?.apply {
+                    stopAnimation()
+                    visibility = View.GONE
+                }
+                mainHandler.removeCallbacks(gameLoop)
+            },
+            onRestore = {
+                petView?.apply {
+                    visibility = View.VISIBLE
+                    startAnimation()
+                }
+                mainHandler.post(gameLoop)
+            }
+        )
+
+        touchHandler = PetTouchHandler()
+        touchHandler.callback = object : PetTouchHandler.Callback {
+            override fun getCurrentState() = stateMachine?.currentState
+            override fun getLayoutParams() = layoutParams
+            override fun onTap() = handleTap()
+            override fun onLongPress() = showMenu()
+            override fun onDragStart() { stateMachine?.transitionTo(PetState.DRAGGED) }
+            override fun onDragEnd() { stateMachine?.transitionTo(PetState.IDLE) }
+            override fun dismissMenu() = menuManager.dismiss()
+            override fun updateViewLayout(view: View) {
+                try { windowManager.updateViewLayout(view, layoutParams) } catch (_: Exception) {}
+            }
+        }
+
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
@@ -186,10 +160,7 @@ class PetOverlayService : Service() {
         }
         registerReceiver(screenReceiver, filter)
 
-        launcherPackage = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-            .let { packageManager.resolveActivity(it, 0)?.activityInfo?.packageName }
-
-        startGameCheckIfEnabled()
+        gameDetector.startIfEnabled(preferences.hideInGame)
         showOverlay()
     }
 
@@ -197,13 +168,11 @@ class PetOverlayService : Service() {
         when (intent?.action) {
             ACTION_CHANGE_POKEMON -> {
                 val pokemonId = intent.getIntExtra(EXTRA_POKEMON_ID, -1)
-                if (pokemonId > 0) {
-                    loadPokemon(pokemonId)
-                }
+                if (pokemonId > 0) loadPokemon(pokemonId)
             }
             ACTION_UPDATE_SETTINGS -> {
                 applySettings()
-                startGameCheckIfEnabled()
+                gameDetector.startIfEnabled(preferences.hideInGame)
             }
             ACTION_COMMAND -> {
                 when (intent.getStringExtra(EXTRA_COMMAND)) {
@@ -211,6 +180,7 @@ class PetOverlayService : Service() {
                     "wake" -> stateMachine?.transitionTo(PetState.IDLE)
                     "walk" -> stateMachine?.transitionTo(PetState.WALK)
                     "run" -> stateMachine?.transitionTo(PetState.RUN)
+                    "react" -> handleTap()
                 }
             }
             ACTION_STOP -> stopSelf()
@@ -226,75 +196,12 @@ class PetOverlayService : Service() {
         return START_STICKY
     }
 
-    private fun applySettings() {
-        val opacity = preferences.opacity / 100f
-
-        // Resize overlay using sprite scale formula
-        resizeOverlay()
-
-        // Update opacity
-        petView?.alpha = opacity
-
-        // Update state machine params
-        stateMachine?.apply {
-            baseSpeed = preferences.getMoveSpeedPx()
-            activityLevel = preferences.activityLevel
-            sleepTimeoutMs = preferences.sleepTimeout * 60 * 1000L
-        }
-    }
-
-    private fun getSpriteScale(): Double {
-        val baseScale = screenHeight / 450.0
-        val userScale = preferences.scale / 100.0
-        return baseScale * userScale
-    }
-
-    /**
-     * Resize overlay to match the current animation's frame size × spriteScale.
-     * Maintains bottom-center anchor so feet stay in place.
-     */
-    private fun resizeForAnimation(animName: String) {
-        val sheet = currentSheet ?: return
-        val params = layoutParams ?: return
-        val view = petView ?: return
-        val info = sheet.anims[animName] ?: return
-
-        val spriteScale = getSpriteScale()
-        val newWidth = (info.frameWidth * spriteScale).toInt().coerceAtLeast(24)
-        val newHeight = (info.frameHeight * spriteScale).toInt().coerceAtLeast(24)
-
-        // Bottom-center anchor: keep feet position fixed
-        val oldCenterX = params.x + params.width / 2
-        val oldBottomY = params.y + params.height
-
-        params.width = newWidth
-        params.height = newHeight
-        params.x = oldCenterX - newWidth / 2
-        params.y = oldBottomY - newHeight
-
-        // Keep within screen bounds
-        if (params.x + newWidth > screenWidth) params.x = screenWidth - newWidth
-        if (params.y + newHeight > screenHeight) params.y = screenHeight - newHeight
-        if (params.x < 0) params.x = 0
-        if (params.y < 0) params.y = 0
-
-        currentAnimName = animName
-
-        try {
-            windowManager.updateViewLayout(view, params)
-        } catch (_: Exception) {}
-    }
-
-    private fun resizeOverlay() {
-        resizeForAnimation(currentAnimName)
-    }
-
     override fun onDestroy() {
         mainHandler.removeCallbacks(gameLoop)
-        mainHandler.removeCallbacks(gameCheckRunnable)
-        longPressHandler.removeCallbacks(longPressRunnable)
+        gameDetector.destroy()
+        touchHandler.destroy()
         try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
-        dismissMenu()
+        menuManager.dismiss()
         petView?.stopAnimation()
         petView?.let { windowManager.removeView(it) }
         petView = null
@@ -303,10 +210,12 @@ class PetOverlayService : Service() {
         super.onDestroy()
     }
 
+    // ---- Overlay ----
+
     private fun showOverlay() {
         val view = PetView(this)
 
-        val initialSize = 200 // placeholder — resized in loadPokemon → applySettings
+        val initialSize = 200
         val params = WindowManager.LayoutParams(
             initialSize,
             initialSize,
@@ -320,61 +229,7 @@ class PetOverlayService : Service() {
             y = 500
         }
 
-        view.setOnTouchListener { v, event ->
-            Log.d("PetTouch", "action=${event.action} state=${stateMachine?.currentState} ignoringTouch=$ignoringTouch")
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    Log.d("PetTouch", "ACTION_DOWN state=${stateMachine?.currentState}")
-                    if (stateMachine?.currentState == PetState.REACTION) {
-                        ignoringTouch = true
-                        Log.d("PetTouch", "BLOCKED: ignoring touch during REACTION")
-                        return@setOnTouchListener true
-                    }
-                    ignoringTouch = false
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    touchDownTime = System.currentTimeMillis()
-                    longPressTriggered = false
-                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_MS)
-                    dismissMenu()
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (ignoringTouch) return@setOnTouchListener true
-                    val movedX = Math.abs(event.rawX - initialTouchX)
-                    val movedY = Math.abs(event.rawY - initialTouchY)
-                    if (movedX > TAP_THRESHOLD || movedY > TAP_THRESHOLD) {
-                        longPressHandler.removeCallbacks(longPressRunnable)
-                        if (!longPressTriggered) {
-                            stateMachine?.transitionTo(PetState.DRAGGED)
-                        }
-                    }
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager.updateViewLayout(v, params)
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (ignoringTouch) {
-                        ignoringTouch = false
-                        return@setOnTouchListener true
-                    }
-                    longPressHandler.removeCallbacks(longPressRunnable)
-                    val movedX = Math.abs(event.rawX - initialTouchX)
-                    val movedY = Math.abs(event.rawY - initialTouchY)
-                    if (!longPressTriggered && movedX < TAP_THRESHOLD && movedY < TAP_THRESHOLD) {
-                        handleTap()
-                    } else if (!longPressTriggered) {
-                        stateMachine?.transitionTo(PetState.IDLE)
-                    }
-                    v.performClick()
-                    true
-                }
-                else -> false
-            }
-        }
+        view.setOnTouchListener(touchHandler)
 
         windowManager.addView(view, params)
         petView = view
@@ -387,17 +242,12 @@ class PetOverlayService : Service() {
         val sm = stateMachine ?: return
         val sheet = currentSheet ?: return
 
-        Log.d("PetTouch", "handleTap called, state=${sm.currentState}")
-
         if (sm.currentState == PetState.SLEEP) {
             sm.transitionTo(PetState.IDLE)
             return
         }
 
-        if (sm.currentState == PetState.REACTION || sm.currentState == PetState.DRAGGED) {
-            Log.d("PetTouch", "handleTap BLOCKED: state=${sm.currentState}")
-            return
-        }
+        if (sm.currentState == PetState.REACTION || sm.currentState == PetState.DRAGGED) return
 
         val reactions = sheet.availableReactions()
         if (reactions.isEmpty()) {
@@ -406,114 +256,35 @@ class PetOverlayService : Service() {
         }
 
         val reactionAnim = reactions.random()
-        Log.d("PetTouch", "handleTap: starting REACTION anim=$reactionAnim")
         sm.transitionTo(PetState.REACTION)
 
         petView?.apply {
-            setAnimation(reactionAnim)
+            playAnimationOnce(reactionAnim) {
+                if (sm.currentState == PetState.REACTION) {
+                    sm.transitionTo(PetState.IDLE)
+                }
+            }
             speedMultiplier = 1.0f
         }
-        resizeForAnimation(reactionAnim)
-
-        // Return to idle after animation plays once
-        val info = sheet.anims[reactionAnim]
-        if (info != null) {
-            val totalMs = info.durations.sumOf { it } * 1000L / 60L
-            mainHandler.postDelayed({
-                if (sm.currentState == PetState.REACTION) {
-                    sm.transitionTo(PetState.IDLE)
-                }
-            }, totalMs.coerceAtLeast(500L))
-        } else {
-            mainHandler.postDelayed({
-                if (sm.currentState == PetState.REACTION) {
-                    sm.transitionTo(PetState.IDLE)
-                }
-            }, 1000L)
-        }
     }
-
-    // ---- Long press menu ----
 
     private fun showMenu() {
-        dismissMenu()
         val params = layoutParams ?: return
-
-        val inflater = LayoutInflater.from(this)
-        val menu = inflater.inflate(R.layout.overlay_menu, null)
-
-        val sm = stateMachine
-        val sleepWake = menu.findViewById<TextView>(R.id.menuSleepWake)
-        val walkRun = menu.findViewById<TextView>(R.id.menuWalkRun)
-        val stop = menu.findViewById<TextView>(R.id.menuStop)
-
-        if (sm?.currentState == PetState.SLEEP) {
-            sleepWake.text = "깨우기"
-        } else {
-            sleepWake.text = "재우기"
-        }
-
-        if (sm?.currentState == PetState.RUN) {
-            walkRun.text = "걷기"
-        } else {
-            walkRun.text = "뛰기"
-        }
-
-        // Disable walk if no Walk animation
-        if (currentSheet?.resolveAnimation("Walk") == null) {
-            walkRun.alpha = 0.4f
-            walkRun.isEnabled = false
-        }
-
-        sleepWake.setOnClickListener {
-            if (sm?.currentState == PetState.SLEEP) {
-                sm.transitionTo(PetState.IDLE)
-            } else {
-                sm?.transitionTo(PetState.SLEEP)
+        menuManager.show(params, stateMachine?.currentState, currentSheet?.resolveAnimation("Walk") != null,
+            object : OverlayMenuManager.Callback {
+                override fun onSleepWake() {
+                    val sm = stateMachine ?: return
+                    if (sm.currentState == PetState.SLEEP) sm.transitionTo(PetState.IDLE)
+                    else sm.transitionTo(PetState.SLEEP)
+                }
+                override fun onWalkRun() {
+                    val sm = stateMachine ?: return
+                    if (sm.currentState == PetState.RUN) sm.transitionTo(PetState.WALK)
+                    else sm.transitionTo(PetState.RUN)
+                }
+                override fun onStop() { stopSelf() }
             }
-            dismissMenu()
-        }
-
-        walkRun.setOnClickListener {
-            if (sm?.currentState == PetState.RUN) {
-                sm.transitionTo(PetState.WALK)
-            } else {
-                sm?.transitionTo(PetState.RUN)
-            }
-            dismissMenu()
-        }
-
-        stop.setOnClickListener {
-            dismissMenu()
-            stopSelf()
-        }
-
-        val menuP = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = params.x
-            y = params.y - params.height
-        }
-
-        windowManager.addView(menu, menuP)
-        menuView = menu
-        menuParams = menuP
-
-        // Auto-dismiss after 5 seconds
-        mainHandler.postDelayed({ dismissMenu() }, 5000L)
-    }
-
-    private fun dismissMenu() {
-        menuView?.let {
-            try { windowManager.removeView(it) } catch (_: Exception) {}
-        }
-        menuView = null
-        menuParams = null
+        )
     }
 
     // ---- Movement ----
@@ -551,6 +322,62 @@ class PetOverlayService : Service() {
         } catch (_: Exception) {}
     }
 
+    // ---- Settings & Resize ----
+
+    private fun applySettings() {
+        resizeOverlay()
+        petView?.alpha = preferences.opacity / 100f
+        stateMachine?.apply {
+            baseSpeed = preferences.getMoveSpeedPx()
+            activityLevel = preferences.activityLevel
+            sleepTimeoutMs = preferences.sleepTimeout * 60 * 1000L
+        }
+    }
+
+    private fun getSpriteScale(): Double {
+        val baseScale = screenHeight / 450.0
+        val userScale = preferences.scale / 100.0
+        return baseScale * userScale
+    }
+
+    /**
+     * 오버레이를 최대 프레임 크기 기준으로 리사이즈.
+     * 애니메이션 전환 시에는 호출하지 않음 — surface 재할당으로 인한 끊김 방지.
+     * 설정 변경이나 포켓몬 로드 시에만 호출.
+     */
+    private fun resizeOverlayToMax() {
+        val sheet = currentSheet ?: return
+        val params = layoutParams ?: return
+        val view = petView ?: return
+
+        val spriteScale = getSpriteScale()
+        val newWidth = (sheet.maxFrameWidth * spriteScale).toInt().coerceAtLeast(24)
+        val newHeight = (sheet.maxFrameHeight * spriteScale).toInt().coerceAtLeast(24)
+
+        if (params.width == newWidth && params.height == newHeight) return
+
+        val oldCenterX = params.x + params.width / 2
+        val oldBottomY = params.y + params.height
+
+        params.width = newWidth
+        params.height = newHeight
+        params.x = oldCenterX - newWidth / 2
+        params.y = oldBottomY - newHeight
+
+        if (params.x + newWidth > screenWidth) params.x = screenWidth - newWidth
+        if (params.y + newHeight > screenHeight) params.y = screenHeight - newHeight
+        if (params.x < 0) params.x = 0
+        if (params.y < 0) params.y = 0
+
+        try {
+            windowManager.updateViewLayout(view, params)
+        } catch (_: Exception) {}
+    }
+
+    private fun resizeOverlay() {
+        resizeOverlayToMax()
+    }
+
     // ---- Pokemon loading ----
 
     private val pokemonRepository: PokemonRepository by lazy { PokemonRepository(this) }
@@ -567,13 +394,14 @@ class PetOverlayService : Service() {
                         setAnimation(animName)
                         speedMultiplier = stateMachine?.getSpeedMultiplier() ?: 1.0f
                     }
-                    resizeForAnimation(animName)
                     broadcastState(state)
                 }
                 stateMachine = sm
 
                 val idleAnim = sheet.resolveAnimation("Idle") ?: "Idle"
                 petView?.apply {
+                    maxFrameWidth = sheet.maxFrameWidth
+                    maxFrameHeight = sheet.maxFrameHeight
                     setSpriteSheet(sheet)
                     setAnimation(idleAnim)
                     setDirection(0)
@@ -592,120 +420,6 @@ class PetOverlayService : Service() {
             putExtra(EXTRA_STATE, state.name)
             setPackage(packageName)
         })
-        updateNotification(state)
-    }
-
-    // ---- Notification ----
-
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "PokePet",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "PokePet overlay service"
-        }
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
-    }
-
-    private fun buildNotification(): Notification {
-        return buildNotificationWithState(PetState.IDLE)
-    }
-
-    private fun buildNotificationWithState(state: PetState): Notification {
-        val stateLabel = when (state) {
-            PetState.IDLE -> "대기 중"
-            PetState.WALK -> "걷는 중"
-            PetState.RUN -> "뛰는 중"
-            PetState.SLEEP -> "자는 중"
-            PetState.REACTION -> "반응 중"
-            PetState.DRAGGED -> "드래그 중"
-        }
-
-        val sleepLabel = if (state == PetState.SLEEP) "깨우기" else "재우기"
-
-        val stopIntent = PendingIntent.getService(
-            this, 0,
-            Intent(this, PetOverlayService::class.java).apply { action = ACTION_STOP },
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val sleepIntent = PendingIntent.getService(
-            this, 1,
-            Intent(this, PetOverlayService::class.java).apply { action = ACTION_TOGGLE_SLEEP },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("$currentPokemonName - $stateLabel")
-            .setContentText("화면에서 놀고 있습니다!")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .addAction(Notification.Action.Builder(null, sleepLabel, sleepIntent).build())
-            .addAction(Notification.Action.Builder(null, "중지", stopIntent).build())
-            .setOngoing(true)
-            .build()
-    }
-
-    private fun updateNotification(state: PetState) {
-        val notification = buildNotificationWithState(state)
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
-    }
-
-    // ---- Game detection ----
-
-    private fun startGameCheckIfEnabled() {
-        mainHandler.removeCallbacks(gameCheckRunnable)
-        gameCheckEnabled = preferences.hideInGame && hasUsageStatsPermission()
-        if (gameCheckEnabled) {
-            mainHandler.post(gameCheckRunnable)
-        } else if (isHiddenForGame) {
-            restoreFromGame()
-        }
-    }
-
-    private fun hasUsageStatsPermission(): Boolean {
-        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
-        val now = System.currentTimeMillis()
-        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 60_000, now)
-        return stats != null && stats.isNotEmpty()
-    }
-
-    private fun isForegroundAppGame(): Boolean {
-        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
-        val now = System.currentTimeMillis()
-        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 60_000, now)
-        if (stats.isNullOrEmpty()) return false
-
-        val foreground = stats.maxByOrNull { it.lastTimeUsed } ?: return false
-        val pkg = foreground.packageName
-
-        // Don't hide for our own app, system UI, or launcher
-        if (pkg == packageName || pkg == "com.android.systemui" || pkg == launcherPackage) return false
-
-        return try {
-            val appInfo = packageManager.getApplicationInfo(pkg, 0)
-            appInfo.category == ApplicationInfo.CATEGORY_GAME
-        } catch (_: PackageManager.NameNotFoundException) {
-            false
-        }
-    }
-
-    private fun hideForGame() {
-        isHiddenForGame = true
-        petView?.apply {
-            stopAnimation()
-            visibility = View.GONE
-        }
-        mainHandler.removeCallbacks(gameLoop)
-    }
-
-    private fun restoreFromGame() {
-        isHiddenForGame = false
-        petView?.apply {
-            visibility = View.VISIBLE
-            startAnimation()
-        }
-        mainHandler.post(gameLoop)
+        notificationManager.update(currentPokemonName, state)
     }
 }
