@@ -40,7 +40,7 @@ class PetPreferences(context: Context) {
 
     // Game mode
     var hideInGame: Boolean
-        get() = prefs.getBoolean("hide_in_game", true)
+        get() = prefs.getBoolean("hide_in_game", false)
         set(value) = prefs.edit().putBoolean("hide_in_game", value).apply()
 
     // Speed level → px/frame
