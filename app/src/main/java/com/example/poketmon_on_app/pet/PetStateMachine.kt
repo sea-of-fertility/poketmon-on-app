@@ -123,7 +123,7 @@ class PetStateMachine(
 
     fun getMoveSpeed(): Float {
         return when (currentState) {
-            PetState.WALK -> baseSpeed
+            PetState.WALK -> baseSpeed * 1.1f
             PetState.RUN -> baseSpeed * 2.0f
             else -> 0f
         }
