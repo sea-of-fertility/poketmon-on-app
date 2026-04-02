@@ -36,13 +36,14 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/bsResetBtn"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
             android:text="초기화"
             android:textColor="#4CAF50"
+            android:textSize="15sp"
             app:cornerRadius="12dp"
             app:strokeColor="#4CAF50" />
 
