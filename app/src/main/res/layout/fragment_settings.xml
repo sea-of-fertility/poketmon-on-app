@@ -38,8 +38,12 @@
 
             <TextView
                 android:id="@+id/valScale"
-                android:layout_width="36dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="44dp"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="6dp"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="end"
                 android:text="100%"
                 android:textColor="#4CAF50"
@@ -72,8 +76,12 @@
 
             <TextView
                 android:id="@+id/valOpacity"
-                android:layout_width="36dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="44dp"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="6dp"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="end"
                 android:text="100%"
                 android:textColor="#4CAF50"
@@ -125,8 +133,12 @@
 
             <TextView
                 android:id="@+id/valSpeed"
-                android:layout_width="24dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="32dp"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="6dp"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="end"
                 android:text="3"
                 android:textColor="#4CAF50"
@@ -159,8 +171,12 @@
 
             <TextView
                 android:id="@+id/valFreq"
-                android:layout_width="24dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="32dp"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="6dp"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="end"
                 android:text="3"
                 android:textColor="#4CAF50"
@@ -252,8 +268,12 @@
 
             <TextView
                 android:id="@+id/valSleep"
-                android:layout_width="36dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="44dp"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="6dp"
+                android:background="?attr/selectableItemBackground"
                 android:gravity="end"
                 android:text="3분"
                 android:textColor="#4CAF50"
